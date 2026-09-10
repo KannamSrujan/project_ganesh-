@@ -1,0 +1,74 @@
+"use strict";
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.createApp = createApp;
+const express_1 = __importDefault(require("express"));
+const cors_1 = __importDefault(require("cors"));
+const helmet_1 = __importDefault(require("helmet"));
+const cookie_parser_1 = __importDefault(require("cookie-parser"));
+const mandapams_routes_js_1 = __importDefault(require("./routes/mandapams.routes.js"));
+const admin_routes_js_1 = __importDefault(require("./routes/admin.routes.js"));
+function createApp() {
+    const app = (0, express_1.default)();
+    // Security headers via Helmet (configured appropriately for API backend)
+    app.use((0, helmet_1.default)());
+    // Hardened CORS: allow development origin and any configured in CORS_ORIGIN
+    const allowedOrigins = new Set(['http://localhost:5173']);
+    if (process.env.CORS_ORIGIN) {
+        process.env.CORS_ORIGIN.split(',')
+            .map((o) => o.trim())
+            .filter(Boolean)
+            .forEach((o) => allowedOrigins.add(o));
+    }
+    app.use((0, cors_1.default)({
+        origin: (origin, callback) => {
+            // Allow requests with no origin (e.g. curl, server-to-server, Postman)
+            if (!origin) {
+                callback(null, true);
+                return;
+            }
+            if (allowedOrigins.has(origin)) {
+                callback(null, true);
+            }
+            else {
+                callback(new Error(`CORS error: Origin '${origin}' is not allowed.`));
+            }
+        },
+        credentials: true,
+    }));
+    app.use((0, cookie_parser_1.default)());
+    app.use(express_1.default.json({ limit: '100kb' }));
+    app.use(express_1.default.urlencoded({ extended: true, limit: '100kb' }));
+    // Health check
+    app.get('/api/health', (_req, res) => {
+        res.json({
+            status: 'ok',
+            service: 'ganesh-darshan-backend',
+            timestamp: new Date().toISOString(),
+        });
+    });
+    // API Routes
+    app.use('/api/mandapams', mandapams_routes_js_1.default);
+    app.use('/api/admin', admin_routes_js_1.default);
+    // 404 Handler
+    app.use((_req, res) => {
+        res.status(404).json({ success: false, error: 'Endpoint not found' });
+    });
+    // Global Error Handler with production error message masking
+    app.use((err, _req, res, _next) => {
+        console.error('[App Error]:', err);
+        const isProduction = process.env.NODE_ENV === 'production';
+        const status = err.status || err.statusCode || 500;
+        if (status === 413) {
+            res.status(413).json({ success: false, error: 'Request payload too large. Maximum size is 100kb.' });
+            return;
+        }
+        res.status(status).json({
+            success: false,
+            error: isProduction ? (status === 500 ? 'Internal server error' : err.message) : (err.message || 'Internal server error'),
+        });
+    });
+    return app;
+}
