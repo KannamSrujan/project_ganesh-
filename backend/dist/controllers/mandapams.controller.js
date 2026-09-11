@@ -21,6 +21,7 @@ async function getApprovedMandapams(req, res) {
     try {
         const { area, search } = req.query;
         const data = await (0, mandapamService_js_1.listApprovedMandapams)(typeof area === 'string' ? area : undefined, typeof search === 'string' ? search : undefined);
+        res.set('Cache-Control', 'public, max-age=30, stale-while-revalidate=60');
         res.json({ success: true, data });
     }
     catch (error) {
@@ -35,6 +36,7 @@ async function getApprovedMandapams(req, res) {
 async function getFeaturedMandapams(_req, res) {
     try {
         const data = await (0, mandapamService_js_1.listFeaturedMandapams)();
+        res.set('Cache-Control', 'public, max-age=60, stale-while-revalidate=120');
         res.json({ success: true, data });
     }
     catch (error) {
@@ -51,6 +53,7 @@ async function getMandapamById(req, res) {
         const rawId = req.params.id;
         const id = Array.isArray(rawId) ? rawId[0] : rawId;
         const data = await (0, mandapamService_js_1.getMandapamById)(id ?? '');
+        res.set('Cache-Control', 'public, max-age=60');
         res.json({ success: true, data });
     }
     catch (error) {

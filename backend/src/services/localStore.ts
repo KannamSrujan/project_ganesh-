@@ -103,6 +103,8 @@ class LocalStore {
     }
   }
 
+  private writeQueue: Promise<void> = Promise.resolve();
+
   private init(): void {
     if (this.initialized) return;
     this.ensureDirs();
@@ -123,19 +125,37 @@ class LocalStore {
 
     // Seed default data
     this.cache = [...SEED_MANDAPAMS];
-    this.persistSync();
+    this.persistAsync();
     this.initialized = true;
   }
 
-  private persistSync(): void {
+  private persistAsync(): void {
+    // Snapshot the current cache to preserve atomic state at mutation time
+    const dataToWrite = JSON.stringify(this.cache, null, 2);
+    this.writeQueue = this.writeQueue
+      .then(() => this._writeToDisk(dataToWrite))
+      .catch((err) => {
+        console.error('[LocalStore] Failed to persist data to disk:', err);
+      });
+  }
+
+  private async _writeToDisk(data: string): Promise<void> {
     try {
-      this.ensureDirs();
-      const tempFile = `${DATA_FILE}.tmp.${Date.now()}`;
-      fs.writeFileSync(tempFile, JSON.stringify(this.cache, null, 2), 'utf-8');
-      fs.renameSync(tempFile, DATA_FILE);
+      await fs.promises.mkdir(DATA_DIR, { recursive: true });
+      const tempFile = `${DATA_FILE}.tmp.${Date.now()}.${Math.random().toString(36).slice(2, 8)}`;
+      await fs.promises.writeFile(tempFile, data, 'utf-8');
+      await fs.promises.rename(tempFile, DATA_FILE);
     } catch (err) {
-      console.error('[LocalStore] Failed to persist data to disk:', err);
+      console.error('[LocalStore] Error writing data file to disk:', err);
+      throw err;
     }
+  }
+
+  /**
+   * Allows graceful shutdown to wait for pending persistence writes.
+   */
+  public async waitForPendingWrites(): Promise<void> {
+    await this.writeQueue;
   }
 
   public async getAll(): Promise<Mandapam[]> {
@@ -196,7 +216,7 @@ class LocalStore {
     this.init();
     // Add to top of cache
     this.cache.unshift(item);
-    this.persistSync();
+    this.persistAsync();
     return { ...item };
   }
 
@@ -211,7 +231,7 @@ class LocalStore {
       updated_at: new Date().toISOString(),
     };
 
-    this.persistSync();
+    this.persistAsync();
     return { ...this.cache[index] };
   }
 
@@ -221,19 +241,15 @@ class LocalStore {
     if (index === -1) return false;
 
     const [deleted] = this.cache.splice(index, 1);
-    this.persistSync();
+    this.persistAsync();
 
-    // Clean up local uploaded file if exists
+    // Clean up local uploaded file asynchronously if exists (missing file does not cause error)
     if (deleted.image_url && deleted.image_url.startsWith('/api/uploads/')) {
       const filename = path.basename(deleted.image_url);
       const filePath = path.join(UPLOADS_DIR, filename);
-      if (fs.existsSync(filePath)) {
-        try {
-          fs.unlinkSync(filePath);
-        } catch {
-          // ignore cleanup error
-        }
-      }
+      fs.promises.unlink(filePath).catch(() => {
+        // Missing file or deletion error must NOT cause delete operation to fail
+      });
     }
 
     return true;

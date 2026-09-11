@@ -9,6 +9,11 @@ const adminAuth_js_1 = require("../middleware/adminAuth.js");
 const csrf_js_1 = require("../middleware/csrf.js");
 const admin_controller_js_1 = require("../controllers/admin.controller.js");
 const router = (0, express_1.Router)();
+// Ensure all admin responses are never cached by intermediaries or browsers
+router.use((_req, res, next) => {
+    res.set('Cache-Control', 'no-store, private');
+    next();
+});
 // Rate limiter for admin login: 5 failed attempts per 15 min per IP
 const adminLoginLimiter = (0, express_rate_limit_1.default)({
     windowMs: 15 * 60 * 1000, // 15 minutes

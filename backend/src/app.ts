@@ -1,6 +1,7 @@
 import express, { Express, Request, Response, NextFunction } from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
+import compression from 'compression';
 import cookieParser from 'cookie-parser';
 import path from 'path';
 import fs from 'fs';
@@ -10,10 +11,21 @@ import adminRouter from './routes/admin.routes.js';
 export function createApp(): Express {
   const app = express();
 
+  // Trust first upstream reverse proxy (Render, Railway, Fly.io, Cloudflare)
+  // Ensures req.ip correctly identifies client IP for rate limiters without allowing client spoofing
+  app.set('trust proxy', 1);
+
   // Security headers via Helmet (allow cross-origin for local asset images)
   app.use(
     helmet({
       crossOriginResourcePolicy: { policy: 'cross-origin' },
+    }),
+  );
+
+  // HTTP response compression (skip responses < 1KB or already compressed image media)
+  app.use(
+    compression({
+      threshold: 1024,
     }),
   );
 
@@ -55,8 +67,9 @@ export function createApp(): Express {
   app.use('/api/uploads', express.static(uploadsDir));
   app.use('/uploads', express.static(uploadsDir));
 
-  // Health check
+  // Health check (explicitly not cached)
   app.get('/api/health', (_req: Request, res: Response) => {
+    res.set('Cache-Control', 'no-store');
     res.json({
       status: 'ok',
       service: 'ganesh-darshan-backend',

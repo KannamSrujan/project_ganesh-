@@ -91,7 +91,7 @@ export async function listApprovedMandapams(
       );
     }
 
-    const { data, error } = await withTimeout(Promise.resolve(query), 2000);
+    const { data, error } = await withTimeout(Promise.resolve(query), 800);
 
     if (error || !data || data.length === 0) {
       return localData;
@@ -128,7 +128,7 @@ export async function listFeaturedMandapams(): Promise<Mandapam[]> {
           .eq('is_featured', true)
           .order('created_at', { ascending: false })
       ),
-      2000
+      800
     );
 
     if (error || !featured || featured.length === 0) {
@@ -156,7 +156,6 @@ export async function getMandapamById(id: string): Promise<Mandapam> {
 
   const supabase = getPublicDbClient();
   if (!supabase) {
-    if (localItem) return localItem;
     throw new MandapamServiceError(404, 'Mandapam not found');
   }
 
@@ -170,17 +169,15 @@ export async function getMandapamById(id: string): Promise<Mandapam> {
           .eq('status', 'approved')
           .maybeSingle()
       ),
-      2000
+      800
     );
 
     if (error || !data) {
-      if (localItem) return localItem;
       throw new MandapamServiceError(404, 'Mandapam not found');
     }
 
     return data as Mandapam;
   } catch (error) {
-    if (localItem) return localItem;
     if (error instanceof MandapamServiceError) throw error;
     throw new MandapamServiceError(404, 'Mandapam not found');
   }
@@ -216,10 +213,7 @@ export async function createMandapamSubmission(
     }
   }
 
-  // In development, auto-approve submissions by default so they appear immediately in Explore
-  const autoApprove = process.env.AUTO_APPROVE_SUBMISSIONS !== 'false';
-  const submissionStatus: MandapamStatus = autoApprove ? 'approved' : 'pending';
-
+  // Every new public submission must ALWAYS start in 'pending' moderation status
   const newMandapam: Mandapam = {
     id: crypto.randomUUID(),
     name: payload.name.trim(),
@@ -229,7 +223,7 @@ export async function createMandapamSubmission(
     latitude: payload.latitude,
     longitude: payload.longitude,
     image_url: localImagePath,
-    status: submissionStatus,
+    status: 'pending',
     is_featured: false,
     is_verified: false,
     submitted_by: payload.submitted_by?.trim() || null,
