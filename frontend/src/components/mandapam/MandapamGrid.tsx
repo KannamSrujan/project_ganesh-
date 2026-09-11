@@ -43,20 +43,18 @@ export function MandapamGrid ({
   }
 
   return (
-    <div>
+    <div className='mx-auto max-w-[1400px]'>
       {heading && (
         <p className='mb-4 text-sm text-[var(--color-text-muted)]'>
           {mandapams.length} mandapam{mandapams.length !== 1 ? 's' : ''} found
         </p>
       )}
 
-      <div className='grid gap-5 md:grid-cols-2 xl:grid-cols-3'>
+      <div className='columns-1 gap-[14px] sm:columns-2 lg:columns-3 xl:columns-4 2xl:columns-5'>
         {mandapams.map(m => (
-          <MandapamCard
-            key={m.id}
-            mandapam={m}
-            distanceKm={distances?.[m.id]}
-          />
+          <div key={m.id} className='mb-[14px] break-inside-avoid'>
+            <MandapamCard mandapam={m} distanceKm={distances?.[m.id]} />
+          </div>
         ))}
       </div>
     </div>

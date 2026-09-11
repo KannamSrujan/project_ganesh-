@@ -56,10 +56,8 @@ export function SubmitMandapamForm () {
   const isSubmittingRef = useRef(false)
 
   const nameInputId = useId()
-  const areaInputId = useId()
   const addressInputId = useId()
   const descInputId = useId()
-  const datalistId = useId()
 
   const validate = (): boolean => {
     const newErrors: FormErrors = {}
@@ -228,38 +226,25 @@ export function SubmitMandapamForm () {
         </div>
 
         <div className='space-y-2'>
-          <label
-            htmlFor={areaInputId}
-            className='flex items-center gap-1 text-sm font-bold text-[var(--color-text)]'
-          >
-            Area / Locality <span className='text-red-600'>*</span>
+          <label className='flex items-center gap-1 text-sm font-bold text-[var(--color-text)]'>
+            Location <span className='text-red-600'>*</span>
           </label>
-          <input
-            id={areaInputId}
-            type='text'
-            list={datalistId}
-            value={area}
-            onChange={e => {
-              setArea(e.target.value)
+          <LocationPicker
+            selectedLocation={location}
+            selectedArea={area}
+            onAreaChange={value => {
+              setArea(value)
               if (errors.area) setErrors(prev => ({ ...prev, area: undefined }))
             }}
-            placeholder='Select or enter area (e.g. Khairatabad, Dilsukhnagar)'
-            maxLength={100}
-            className={`w-full rounded-[var(--radius-md)] border bg-[var(--color-surface-muted)] px-4 py-3 text-sm text-[var(--color-text)] outline-none transition placeholder:text-[var(--color-text-muted)] focus:border-[var(--color-primary)] focus:ring-4 focus:ring-[var(--color-primary-soft)] ${
-              errors.area ? 'border-red-300' : 'border-[var(--color-border)]'
-            }`}
-            aria-invalid={!!errors.area}
-            aria-describedby={errors.area ? 'area-error' : undefined}
-            required
+            areas={HYDERABAD_AREAS}
+            onLocationSelect={coords => {
+              setLocation(coords)
+              if (errors.location) {
+                setErrors(prev => ({ ...prev, location: undefined }))
+              }
+            }}
+            error={errors.location}
           />
-          <datalist id={datalistId}>
-            {HYDERABAD_AREAS.map(loc => (
-              <option key={loc} value={loc} />
-            ))}
-          </datalist>
-          <span className='text-xs text-[var(--color-text-muted)]'>
-            Choose a suggestion or type any area name in Hyderabad.
-          </span>
           {errors.area && (
             <p
               id='area-error'
@@ -269,22 +254,6 @@ export function SubmitMandapamForm () {
               {errors.area}
             </p>
           )}
-        </div>
-
-        <div className='space-y-2'>
-          <label className='flex items-center gap-1 text-sm font-bold text-[var(--color-text)]'>
-            Location on Map <span className='text-red-600'>*</span>
-          </label>
-          <LocationPicker
-            selectedLocation={location}
-            onLocationSelect={coords => {
-              setLocation(coords)
-              if (errors.location) {
-                setErrors(prev => ({ ...prev, location: undefined }))
-              }
-            }}
-            error={errors.location}
-          />
         </div>
 
         <div className='space-y-2'>

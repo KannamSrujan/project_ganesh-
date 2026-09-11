@@ -2,9 +2,7 @@ import { useState, useMemo, useCallback } from 'react'
 import type { Mandapam } from '../types/mandapam'
 import { haversineDistance } from '../utils/distance'
 import { HeroSection } from './homepage/HeroSection'
-import { SearchAndFilterSection } from './homepage/SearchAndFilterSection'
 import { FeaturedMandapamsSection } from './homepage/FeaturedMandapamsSection'
-import { AreaExplorerSection } from './homepage/AreaExplorerSection'
 import { MapSection } from './homepage/MapSection'
 import { AllMandapamsSection } from './homepage/AllMandapamsSection'
 import { AddMandapamSection } from './homepage/AddMandapamSection'
@@ -169,24 +167,9 @@ export function HomepageContent ({
         </div>
       )}
 
-      <SearchAndFilterSection
-        searchQuery={searchQuery}
-        selectedArea={selectedArea}
-        availableAreas={availableAreas}
-        onSearchChange={setSearchQuery}
-        onAreaSelect={setSelectedArea}
-      />
-
       <FeaturedMandapamsSection
         featuredMandapams={featuredMandapams}
         distanceMap={distanceMap}
-      />
-
-      <AreaExplorerSection
-        availableAreas={availableAreas}
-        selectedArea={selectedArea}
-        onAreaSelect={handleAreaSelect}
-        onScrollToMandapams={handleScrollToMandapams}
       />
 
       <MapSection allMandapams={allMandapams} userLocation={userLocation} />
@@ -200,6 +183,10 @@ export function HomepageContent ({
         sortByDistance={sortByDistance}
         distanceMap={distanceMap}
         onClearAllFilters={clearAllFilters}
+        searchQuery={searchQuery}
+        availableAreas={availableAreas}
+        onSearchChange={setSearchQuery}
+        onAreaSelect={setSelectedArea}
       />
 
       <AddMandapamSection />

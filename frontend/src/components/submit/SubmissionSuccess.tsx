@@ -9,13 +9,17 @@ export function SubmissionSuccess ({ onReset }: SubmissionSuccessProps) {
     <div className='rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-white p-8 sm:p-10'>
       <div className='flex flex-col items-center gap-5 text-center'>
         <span className='text-5xl leading-none' aria-hidden='true'>
-          🎉
+          ✅
         </span>
         <h2 className='text-2xl font-extrabold tracking-tight text-[var(--color-text)] sm:text-3xl'>
-          Thanks for helping Hyderabad discover more Ganesh mandapams!
+          Submission received
         </h2>
         <p className='max-w-xl text-base leading-7 text-[var(--color-text-secondary)]'>
-          Your submission has been received and will appear after verification.
+          Thank you for helping Hyderabad discover more Ganesh mandapams.
+        </p>
+        <p className='max-w-xl text-base leading-7 text-[var(--color-text-secondary)]'>
+          Your submission has been sent for review and will appear after
+          verification.
         </p>
 
         <div className='flex w-full max-w-lg flex-col gap-3 sm:flex-row sm:justify-center'>

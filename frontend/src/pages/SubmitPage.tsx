@@ -22,13 +22,17 @@ export function SubmitPage () {
       </nav>
 
       <main className='flex-1 bg-white pb-16'>
-        <div className='mx-auto max-w-3xl px-4 pt-8 sm:px-6 lg:px-8'>
+        <div className='mx-auto max-w-[820px] px-4 pt-8 sm:px-6 lg:px-8'>
           <header className='mb-7 text-center'>
             <h1 className='text-3xl font-extrabold tracking-[-0.05em] text-[var(--color-text)] sm:text-4xl'>
-              Know a Ganesh Mandapam We&apos;re Missing?
+              Know a Ganesh Mandapam we&apos;re missing?
             </h1>
             <p className='mt-3 text-lg text-[var(--color-text-secondary)]'>
-              Help other Hyderabad residents discover it.
+              Help Hyderabad discover it.
+            </p>
+            <p className='mx-auto mt-3 max-w-2xl text-sm leading-6 text-[var(--color-text-secondary)]'>
+              Share a Mandapam with the community. We&apos;ll review your
+              submission before it appears in the directory.
             </p>
           </header>
 

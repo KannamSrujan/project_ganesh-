@@ -1,5 +1,6 @@
 import { MandapamGrid } from '../mandapam/MandapamGrid'
 import type { Mandapam } from '../../types/mandapam'
+import { SearchAndFilterSection } from './SearchAndFilterSection'
 
 interface AllMandapamsSectionProps {
   allMandapams: Mandapam[]
@@ -10,6 +11,10 @@ interface AllMandapamsSectionProps {
   sortByDistance: boolean
   distanceMap: Record<string, number>
   onClearAllFilters: () => void
+  searchQuery: string
+  availableAreas: string[]
+  onSearchChange: (value: string) => void
+  onAreaSelect: (area: string | null) => void
 }
 
 export function AllMandapamsSection ({
@@ -20,7 +25,11 @@ export function AllMandapamsSection ({
   showMandapamLoadingState,
   sortByDistance,
   distanceMap,
-  onClearAllFilters
+  onClearAllFilters,
+  searchQuery,
+  availableAreas,
+  onSearchChange,
+  onAreaSelect
 }: AllMandapamsSectionProps) {
   return (
     <section
@@ -29,19 +38,47 @@ export function AllMandapamsSection ({
       aria-label='All mandapams'
     >
       <div className='container'>
-        <div className='mb-5 flex flex-wrap items-center justify-between gap-3'>
-          <h2 className='text-2xl font-bold tracking-[-0.02em] text-[var(--color-text)]'>
-            {selectedArea ? `Mandapams in ${selectedArea}` : 'All Mandapams'}
-          </h2>
-          {hasActiveFilters && (
-            <button
-              type='button'
-              onClick={onClearAllFilters}
-              className='inline-flex items-center justify-center rounded-full border border-[var(--color-border)] bg-white px-3 py-1.5 text-sm font-medium text-[var(--color-text-secondary)] transition hover:border-[var(--color-border-strong)] hover:text-[var(--color-text)]'
-            >
-              ✕ Clear filters
-            </button>
-          )}
+        <div className='mb-8 flex flex-col gap-4 md:flex-row md:items-end md:justify-between'>
+          <div className='max-w-2xl'>
+            <p className='mb-3 text-[0.7rem] font-semibold uppercase tracking-[0.18em] text-[var(--color-text-muted)]'>
+              Ganesh Darshan Hyderabad
+            </p>
+            <h2 className='text-3xl font-bold tracking-[-0.04em] text-[var(--color-text)] sm:text-4xl'>
+              {selectedArea
+                ? `Discover ${selectedArea}`
+                : 'Discover Ganesh Mandapams'}
+            </h2>
+            <p className='mt-3 text-base text-[var(--color-text-secondary)]'>
+              Explore Ganesh celebrations, mandapams and traditions across
+              Hyderabad.
+            </p>
+          </div>
+
+          <div className='flex flex-wrap items-center gap-3'>
+            <div className='rounded-full border border-[var(--color-border)] bg-white px-3 py-1.5 text-sm font-medium text-[var(--color-text-secondary)]'>
+              {filteredMandapams.length} registered
+              {filteredMandapams.length === 1 ? '' : 'd'}
+            </div>
+            {hasActiveFilters && (
+              <button
+                type='button'
+                onClick={onClearAllFilters}
+                className='inline-flex items-center justify-center rounded-full border border-[var(--color-border)] bg-white px-3 py-1.5 text-sm font-medium text-[var(--color-text-secondary)] transition hover:border-[var(--color-border-strong)] hover:text-[var(--color-text)]'
+              >
+                ✕ Clear filters
+              </button>
+            )}
+          </div>
+        </div>
+
+        <div className='mb-8'>
+          <SearchAndFilterSection
+            searchQuery={searchQuery}
+            selectedArea={selectedArea}
+            availableAreas={availableAreas}
+            onSearchChange={onSearchChange}
+            onAreaSelect={onAreaSelect}
+          />
         </div>
 
         {showMandapamLoadingState ? (

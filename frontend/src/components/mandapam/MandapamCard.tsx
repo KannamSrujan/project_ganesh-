@@ -1,8 +1,8 @@
+import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import type { Mandapam } from '../../types/mandapam'
 import { Badge } from '../ui/Badge'
-import { formatDistance } from '../../utils/distance'
-import { resolveImageUrl } from '../../utils/imageUrl'
+import { getFallbackImageUrl, resolveImageUrl } from '../../utils/imageUrl'
 
 interface MandapamCardProps {
   mandapam: Mandapam
@@ -10,81 +10,66 @@ interface MandapamCardProps {
   distanceKm?: number
 }
 
-export function MandapamCard ({ mandapam, distanceKm }: MandapamCardProps) {
-  const directionsUrl = `https://www.google.com/maps/dir/?api=1&destination=${mandapam.latitude},${mandapam.longitude}`
-  const displayImage = resolveImageUrl(mandapam.image_url)
+export function MandapamCard ({ mandapam }: MandapamCardProps) {
+  const fallbackImage = getFallbackImageUrl(mandapam.id)
+  const [displayImage, setDisplayImage] = useState(() =>
+    resolveImageUrl(mandapam.image_url, mandapam.id)
+  )
+  const locationText = [mandapam.area, 'Hyderabad'].filter(Boolean).join(', ')
 
   return (
-    <article className='group flex h-full flex-col overflow-hidden rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[var(--color-surface)] transition-all duration-200 hover:-translate-y-0.5 hover:border-[var(--color-border-strong)]'>
-      <div className='relative aspect-[16/9] overflow-hidden bg-[var(--color-surface-muted)]'>
-        {displayImage ? (
+    <div className='group rounded-[18px] bg-[var(--color-surface)]'>
+      <Link
+        to={`/mandapams/${mandapam.id}`}
+        aria-label={`${mandapam.name} in ${locationText}`}
+        className='block overflow-hidden rounded-[18px] focus-visible:outline-none'
+      >
+        <div className='relative overflow-hidden rounded-[18px] bg-[var(--color-surface-muted)]'>
           <img
             src={displayImage}
             alt={mandapam.name}
-            className='h-full w-full object-cover transition duration-300 group-hover:scale-[1.03]'
             loading='lazy'
+            decoding='async'
+            onError={() => {
+              setDisplayImage(current =>
+                current === fallbackImage ? current : fallbackImage
+              )
+            }}
+            className='block h-auto w-full transition duration-300 ease-out group-hover:scale-[1.02] group-focus-visible:scale-[1.02]'
           />
-        ) : (
-          <div
-            className='flex h-full w-full items-center justify-center bg-[var(--color-surface-muted)]'
-            aria-hidden='true'
-          >
-            <span className='text-5xl opacity-60'>🕉️</span>
+
+          <div className='absolute inset-0 bg-[rgba(17,17,17,0.38)] opacity-0 transition-opacity duration-200 group-hover:opacity-100 group-focus-visible:opacity-100' />
+
+          <div className='absolute left-3 top-3 flex flex-wrap gap-1.5'>
+            {mandapam.is_featured && <Badge variant='featured'>Featured</Badge>}
           </div>
-        )}
 
-        <div className='absolute left-3 top-3 flex flex-wrap gap-1.5'>
-          {mandapam.is_featured && <Badge variant='featured'>Featured</Badge>}
-          {mandapam.is_verified && <Badge variant='verified'>Verified</Badge>}
+          <div className='pointer-events-none absolute inset-x-0 bottom-0 p-3 text-white opacity-0 translate-y-2 transition-all duration-200 group-hover:opacity-100 group-hover:translate-y-0 group-focus-visible:opacity-100 group-focus-visible:translate-y-0 md:p-4'>
+            <p className='text-[0.62rem] font-medium uppercase tracking-[0.15em] text-white/75'>
+              {locationText}
+            </p>
+            <h3 className='mt-1 text-base font-semibold leading-tight tracking-[-0.02em] sm:text-lg'>
+              {mandapam.name}
+            </h3>
+          </div>
         </div>
-      </div>
+      </Link>
 
-      <div className='flex flex-1 flex-col gap-2 p-4'>
-        <div className='flex items-center justify-between gap-2'>
-          <span className='text-[0.68rem] font-bold uppercase tracking-[0.12em] text-[var(--color-primary-dark)]'>
-            📍 {mandapam.area}
-          </span>
-          {distanceKm !== undefined && (
-            <span className='rounded-full bg-[var(--color-primary-soft)] px-2 py-1 text-[0.7rem] font-semibold text-[var(--color-text-secondary)]'>
-              {formatDistance(distanceKm)}
-            </span>
-          )}
-        </div>
-
-        <h3 className='text-lg font-bold text-[var(--color-text)] line-clamp-2'>
-          {mandapam.name}
-        </h3>
-
-        {mandapam.description && (
-          <p className='text-sm leading-6 text-[var(--color-text-secondary)] line-clamp-2'>
-            {mandapam.description}
+      <div className='mt-2 flex items-center justify-between gap-2 px-1 pb-1 md:hidden'>
+        <div>
+          <p className='text-[0.62rem] font-semibold uppercase tracking-[0.12em] text-[var(--color-text-muted)]'>
+            {locationText}
           </p>
-        )}
-
-        {mandapam.address && (
-          <p className='truncate text-xs text-[var(--color-text-muted)]'>
-            {mandapam.address}
-          </p>
-        )}
-
-        <div className='mt-auto flex flex-wrap gap-2 pt-2'>
-          <Link
-            to={`/mandapams/${mandapam.id}`}
-            className='flex-1 rounded-full bg-[var(--color-primary)] px-4 py-2.5 text-center text-sm font-semibold text-white transition hover:bg-[var(--color-primary-dark)]'
-          >
-            View Details
-          </Link>
-          <a
-            href={directionsUrl}
-            target='_blank'
-            rel='noopener noreferrer'
-            className='flex-1 rounded-full border border-[var(--color-border)] bg-white px-4 py-2.5 text-center text-sm font-semibold text-[var(--color-text-secondary)] transition hover:border-[var(--color-border-strong)] hover:text-[var(--color-text)]'
-            aria-label={`Get directions to ${mandapam.name}`}
-          >
-            Directions
-          </a>
+          <h3 className='text-sm font-semibold text-[var(--color-text)]'>
+            {mandapam.name}
+          </h3>
         </div>
+        {mandapam.is_featured && (
+          <Badge variant='featured' className='shrink-0'>
+            Featured
+          </Badge>
+        )}
       </div>
-    </article>
+    </div>
   )
 }

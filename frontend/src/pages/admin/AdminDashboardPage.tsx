@@ -13,19 +13,59 @@ import {
   checkAdminAuth,
   AdminMandapam
 } from '../../services/adminApi'
-import { Badge } from '../../components/ui/Badge'
+
+const tabs = [
+  { value: 'pending', label: 'Pending Submissions' },
+  { value: 'approved', label: 'Approved Listings' },
+  { value: 'rejected', label: 'Rejected' },
+  { value: 'all', label: 'All Records' }
+] as const
+
+type AdminTab = typeof tabs[number]['value']
+
+function formatDate (value?: string | null) {
+  if (!value) return '—'
+
+  return new Date(value).toLocaleDateString('en-IN', {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric'
+  })
+}
+
+function formatDateTime (value?: string | null) {
+  if (!value) return '—'
+
+  return new Date(value).toLocaleString('en-IN', {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit'
+  })
+}
+
+function hasValue (value: unknown) {
+  if (typeof value === 'string') return value.trim().length > 0
+  if (typeof value === 'number') return Number.isFinite(value)
+  return Boolean(value)
+}
+
+function getCardImage (mandapam: AdminMandapam) {
+  if (mandapam.signed_image_url) return mandapam.signed_image_url
+  if (mandapam.image_url) return mandapam.image_url
+  return null
+}
 
 export function AdminDashboardPage () {
   const [mandapams, setMandapams] = useState<AdminMandapam[]>([])
-  const [activeTab, setActiveTab] = useState<
-    'pending' | 'approved' | 'rejected' | 'all'
-  >('pending')
+  const [activeTab, setActiveTab] = useState<AdminTab>('pending')
   const [adminEmail, setAdminEmail] = useState<string>('admin')
   const [isLoading, setIsLoading] = useState(true)
   const [actionError, setActionError] = useState<string | null>(null)
   const [actionSuccess, setActionSuccess] = useState<string | null>(null)
+  const [searchTerm, setSearchTerm] = useState('')
 
-  // Edit Modal State
   const [editingMandapam, setEditingMandapam] = useState<AdminMandapam | null>(
     null
   )
@@ -39,24 +79,23 @@ export function AdminDashboardPage () {
   })
   const [isSavingEdit, setIsSavingEdit] = useState(false)
 
-  // Detail / Image Inspection Modal
   const [inspectingMandapam, setInspectingMandapam] =
     useState<AdminMandapam | null>(null)
   const [isLoadingInspect, setIsLoadingInspect] = useState(false)
+  const [selectedImageIndex, setSelectedImageIndex] = useState(0)
 
   const navigate = useNavigate()
 
-  // Load admin user profile
   useEffect(() => {
     checkAdminAuth().then(res => {
       if (res.email) setAdminEmail(res.email)
     })
   }, [])
 
-  // Fetch list of mandapams for the current tab
   const loadMandapams = useCallback(async () => {
     setIsLoading(true)
     setActionError(null)
+
     try {
       const data = await fetchAdminMandapams(activeTab)
       setMandapams(data)
@@ -71,6 +110,45 @@ export function AdminDashboardPage () {
     loadMandapams()
   }, [loadMandapams])
 
+  useEffect(() => {
+    if (!inspectingMandapam) return
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setInspectingMandapam(null)
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [inspectingMandapam])
+
+  useEffect(() => {
+    setSelectedImageIndex(0)
+  }, [inspectingMandapam?.id])
+
+  const refreshSelectedMandapam = useCallback(async (id: string) => {
+    const detailed = await fetchAdminMandapamById(id)
+    if (detailed) {
+      setInspectingMandapam(detailed)
+    }
+  }, [])
+
+  const filteredMandapams = mandapams.filter(mandapam => {
+    const term = searchTerm.trim().toLowerCase()
+
+    if (!term) return true
+
+    return [
+      mandapam.name,
+      mandapam.area,
+      mandapam.address,
+      mandapam.submitted_by
+    ].some(
+      value => hasValue(value) && String(value).toLowerCase().includes(term)
+    )
+  })
+
   const handleLogout = async () => {
     await adminLogout()
     navigate('/admin/login', { replace: true })
@@ -79,24 +157,36 @@ export function AdminDashboardPage () {
   const handleApprove = async (id: string) => {
     setActionError(null)
     setActionSuccess(null)
+
     const res = await approveAdminMandapam(id)
+
     if (res.success) {
       setActionSuccess(
-        'Mandapam approved successfully and is now publicly live!'
+        'Mandapam approved successfully and is now publicly live.'
       )
-      loadMandapams()
+      await loadMandapams()
+      await refreshSelectedMandapam(id)
     } else {
       setActionError(res.error || 'Failed to approve mandapam.')
     }
   }
 
-  const handleReject = async (id: string) => {
+  const handleReject = async (id: string, name: string) => {
+    const confirmed = window.confirm(
+      `Reject "${name}"? This submission will move to the rejected queue.`
+    )
+
+    if (!confirmed) return
+
     setActionError(null)
     setActionSuccess(null)
+
     const res = await rejectAdminMandapam(id)
+
     if (res.success) {
       setActionSuccess('Mandapam rejected.')
-      loadMandapams()
+      await loadMandapams()
+      await refreshSelectedMandapam(id)
     } else {
       setActionError(res.error || 'Failed to reject mandapam.')
     }
@@ -105,10 +195,17 @@ export function AdminDashboardPage () {
   const handleToggleVerified = async (m: AdminMandapam) => {
     setActionError(null)
     setActionSuccess(null)
+
     const res = await verifyAdminMandapam(m.id, !m.is_verified)
+
     if (res.success) {
-      setActionSuccess(`Verification status updated for ${m.name}.`)
-      loadMandapams()
+      setActionSuccess(
+        `${
+          m.is_verified ? 'Verification removed from' : 'Verification added to'
+        } ${m.name}.`
+      )
+      await loadMandapams()
+      await refreshSelectedMandapam(m.id)
     } else {
       setActionError(res.error || 'Failed to update verification status.')
     }
@@ -117,29 +214,40 @@ export function AdminDashboardPage () {
   const handleToggleFeatured = async (m: AdminMandapam) => {
     setActionError(null)
     setActionSuccess(null)
+
     const res = await featureAdminMandapam(m.id, !m.is_featured)
+
     if (res.success) {
-      setActionSuccess(`Featured status updated for ${m.name}.`)
-      loadMandapams()
+      setActionSuccess(
+        `${
+          m.is_featured
+            ? 'Featured status removed from'
+            : 'Featured status added to'
+        } ${m.name}.`
+      )
+      await loadMandapams()
+      await refreshSelectedMandapam(m.id)
     } else {
       setActionError(res.error || 'Failed to update featured status.')
     }
   }
 
   const handleDelete = async (id: string, name: string) => {
-    if (
-      !window.confirm(
-        `Are you sure you want to permanently delete "${name}"? This action cannot be undone.`
-      )
-    ) {
-      return
-    }
+    const confirmed = window.confirm(
+      `Are you sure you want to permanently delete "${name}"? This action cannot be undone.`
+    )
+
+    if (!confirmed) return
+
     setActionError(null)
     setActionSuccess(null)
+
     const res = await deleteAdminMandapam(id)
+
     if (res.success) {
       setActionSuccess(`Deleted "${name}".`)
-      loadMandapams()
+      setInspectingMandapam(null)
+      await loadMandapams()
     } else {
       setActionError(res.error || 'Failed to delete mandapam.')
     }
@@ -149,6 +257,7 @@ export function AdminDashboardPage () {
     setIsLoadingInspect(true)
     const detailed = await fetchAdminMandapamById(id)
     setIsLoadingInspect(false)
+
     if (detailed) {
       setInspectingMandapam(detailed)
     }
@@ -168,6 +277,7 @@ export function AdminDashboardPage () {
 
   const handleSaveEdit = async (e: React.FormEvent) => {
     e.preventDefault()
+
     if (!editingMandapam) return
 
     setIsSavingEdit(true)
@@ -179,20 +289,131 @@ export function AdminDashboardPage () {
       latitude: parseFloat(editForm.latitude),
       longitude: parseFloat(editForm.longitude)
     })
+
     setIsSavingEdit(false)
 
     if (res.success) {
       setActionSuccess(`Updated "${editForm.name}".`)
       setEditingMandapam(null)
-      loadMandapams()
+      await loadMandapams()
+      await refreshSelectedMandapam(editingMandapam.id)
     } else {
       setActionError(res.error || 'Failed to save changes.')
     }
   }
 
+  const reviewSections = inspectingMandapam
+    ? [
+        {
+          title: 'Submission',
+          items: [
+            { label: 'Mandapam Name', value: inspectingMandapam.name },
+            { label: 'Area', value: inspectingMandapam.area },
+            { label: 'Location', value: inspectingMandapam.address },
+            {
+              label: 'Description',
+              value: inspectingMandapam.description,
+              fullWidth: true
+            },
+            {
+              label: 'Submitted by',
+              value: (inspectingMandapam as any).submitted_by || null
+            }
+          ]
+        },
+        {
+          title: 'Contact',
+          items: [
+            {
+              label: 'Phone',
+              value: (inspectingMandapam as any).phone || null
+            },
+            {
+              label: 'Email',
+              value: (inspectingMandapam as any).email || null
+            },
+            {
+              label: 'Website',
+              value: (inspectingMandapam as any).website || null
+            },
+            {
+              label: 'Social links',
+              value: (inspectingMandapam as any).social_links || null
+            }
+          ]
+        },
+        {
+          title: 'Festival Information',
+          items: [
+            {
+              label: 'Festival dates',
+              value: (inspectingMandapam as any).festival_dates || null
+            },
+            {
+              label: 'Opening time',
+              value: (inspectingMandapam as any).opening_time || null
+            },
+            {
+              label: 'Closing time',
+              value: (inspectingMandapam as any).closing_time || null
+            },
+            {
+              label: 'Special information',
+              value: (inspectingMandapam as any).special_information || null
+            }
+          ]
+        },
+        {
+          title: 'Location',
+          items: [
+            {
+              label: 'Latitude',
+              value: Number.isFinite(inspectingMandapam.latitude)
+                ? inspectingMandapam.latitude
+                : null
+            },
+            {
+              label: 'Longitude',
+              value: Number.isFinite(inspectingMandapam.longitude)
+                ? inspectingMandapam.longitude
+                : null
+            },
+            {
+              label: 'Map',
+              value: `https://www.google.com/maps?q=${inspectingMandapam.latitude},${inspectingMandapam.longitude}`
+            }
+          ]
+        }
+      ]
+        .map(section => ({
+          ...section,
+          items: section.items.filter(item => hasValue(item.value))
+        }))
+        .filter(section => section.items.length > 0)
+    : []
+
+  const reviewImages = (() => {
+    if (!inspectingMandapam) return []
+
+    const extraImages = Array.isArray((inspectingMandapam as any).images)
+      ? (inspectingMandapam as any).images
+          .map((image: any) => (typeof image === 'string' ? image : image?.url))
+          .filter(Boolean)
+      : []
+
+    if (extraImages.length > 0) return extraImages
+
+    const primaryImage =
+      inspectingMandapam.signed_image_url || inspectingMandapam.image_url
+    return primaryImage ? [primaryImage] : []
+  })()
+
+  const selectedReviewImage =
+    reviewImages[selectedImageIndex] || reviewImages[0]
+
   return (
     <div className='min-h-screen bg-[var(--color-surface-muted)]'>
-      <header className='sticky top-0 z-50 border-b border-[var(--color-border)] bg-white/90 backdrop-blur-sm'>
+      <header className='sticky top-0 z-40 border-b border-[var(--color-border)] bg-white/90 backdrop-blur-sm'>
         <div className='mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-3 sm:px-6 lg:px-8'>
           <div className='flex shrink-0 items-center gap-3'>
             <span className='text-2xl leading-none' aria-hidden='true'>
@@ -232,22 +453,37 @@ export function AdminDashboardPage () {
       </header>
 
       <main className='mx-auto max-w-6xl px-4 py-6 sm:px-6 lg:px-8'>
-        <div className='mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between'>
+        <div className='mb-6 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between'>
           <div>
             <h1 className='text-2xl font-extrabold tracking-tight text-[var(--color-text)] sm:text-3xl'>
               Mandapam Moderation Queue
             </h1>
             <p className='mt-1 text-sm text-[var(--color-text-secondary)]'>
-              Review, edit, approve, or reject submissions across Hyderabad.
+              Review submissions quickly, then move them through the moderation
+              workflow.
             </p>
           </div>
-          <button
-            type='button'
-            onClick={() => loadMandapams()}
-            className='inline-flex items-center justify-center rounded-full border border-[var(--color-border)] bg-white px-4 py-2 text-sm font-semibold text-[var(--color-text)] transition hover:border-[var(--color-border-strong)]'
-          >
-            🔄 Refresh
-          </button>
+
+          <div className='flex flex-col gap-3 sm:flex-row sm:items-center'>
+            <label className='relative block'>
+              <span className='sr-only'>Search mandapams</span>
+              <input
+                type='text'
+                value={searchTerm}
+                onChange={event => setSearchTerm(event.target.value)}
+                placeholder='Search mandapams...'
+                className='w-full rounded-full border border-[var(--color-border)] bg-white px-4 py-2.5 text-sm text-[var(--color-text)] outline-none transition focus:border-[var(--color-primary)] focus:ring-4 focus:ring-[var(--color-primary-soft)] sm:w-64'
+              />
+            </label>
+
+            <button
+              type='button'
+              onClick={() => loadMandapams()}
+              className='inline-flex items-center justify-center rounded-full border border-[var(--color-border)] bg-white px-4 py-2 text-sm font-semibold text-[var(--color-text)] transition hover:border-[var(--color-border-strong)]'
+            >
+              ↻ Refresh
+            </button>
+          </div>
         </div>
 
         {actionSuccess && (
@@ -258,6 +494,7 @@ export function AdminDashboardPage () {
             ✓ {actionSuccess}
           </div>
         )}
+
         {actionError && (
           <div
             className='mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700'
@@ -268,24 +505,21 @@ export function AdminDashboardPage () {
         )}
 
         <div className='mb-5 flex gap-2 overflow-x-auto pb-1' role='tablist'>
-          {(['pending', 'approved', 'rejected', 'all'] as const).map(tab => (
+          {tabs.map(tab => (
             <button
-              key={tab}
+              key={tab.value}
               type='button'
               role='tab'
-              aria-selected={activeTab === tab}
-              onClick={() => setActiveTab(tab)}
+              aria-selected={activeTab === tab.value}
+              onClick={() => setActiveTab(tab.value)}
               className={[
                 'shrink-0 rounded-full border px-4 py-2 text-sm font-semibold transition',
-                activeTab === tab
+                activeTab === tab.value
                   ? 'border-[var(--color-primary)] bg-[var(--color-primary)] text-white'
                   : 'border-[var(--color-border)] bg-white text-[var(--color-text-secondary)] hover:border-[var(--color-border-strong)] hover:text-[var(--color-text)]'
               ].join(' ')}
             >
-              {tab === 'pending' && '⏳ Pending Submissions'}
-              {tab === 'approved' && '✅ Approved Listings'}
-              {tab === 'rejected' && '❌ Rejected'}
-              {tab === 'all' && '📁 All Records'}
+              {tab.label}
             </button>
           ))}
         </div>
@@ -297,24 +531,35 @@ export function AdminDashboardPage () {
             </span>
             <p className='text-base font-medium'>Loading moderation records…</p>
           </div>
-        ) : mandapams.length === 0 ? (
+        ) : filteredMandapams.length === 0 ? (
           <div className='flex min-h-[40vh] flex-col items-center justify-center gap-3 px-4 text-center text-[var(--color-text-secondary)]'>
             <span className='text-5xl opacity-70' aria-hidden='true'>
-              🎉
+              📭
             </span>
             <p className='text-base font-medium'>
-              No {activeTab} mandapams in this queue.
+              No {activeTab === 'all' ? 'records' : activeTab} mandapams found.
             </p>
           </div>
         ) : (
           <div className='grid gap-5 md:grid-cols-2 xl:grid-cols-3'>
-            {mandapams.map(m => (
-              <div
-                key={m.id}
-                className='flex flex-col rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-white p-5 transition'
-              >
-                <div className='mb-4 flex items-start justify-between gap-3'>
-                  <div className='flex flex-wrap items-center gap-2'>
+            {filteredMandapams.map(m => {
+              const image = getCardImage(m)
+
+              return (
+                <div
+                  key={m.id}
+                  role='button'
+                  tabIndex={0}
+                  onClick={() => openInspectModal(m.id)}
+                  onKeyDown={event => {
+                    if (event.key === 'Enter' || event.key === ' ') {
+                      event.preventDefault()
+                      openInspectModal(m.id)
+                    }
+                  }}
+                  className='flex cursor-pointer flex-col rounded-[18px] border border-[var(--color-border)] bg-white p-4 shadow-sm transition hover:border-[var(--color-border-strong)] hover:shadow-md focus:outline-none focus:ring-4 focus:ring-[var(--color-primary-soft)]'
+                >
+                  <div className='mb-3 flex items-start justify-between gap-3'>
                     <span
                       className={[
                         'inline-flex rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.08em]',
@@ -327,229 +572,378 @@ export function AdminDashboardPage () {
                     >
                       {m.status}
                     </span>
-                    {m.is_verified && (
-                      <Badge variant='verified'>✓ Verified</Badge>
-                    )}
-                    {m.is_featured && (
-                      <Badge variant='featured'>⭐ Featured</Badge>
-                    )}
+
+                    <span className='text-[11px] font-medium text-[var(--color-text-muted)]'>
+                      {formatDate(m.created_at)}
+                    </span>
                   </div>
-                  <span className='text-xs text-stone-400'>
-                    {new Date(m.created_at).toLocaleDateString('en-IN', {
-                      day: 'numeric',
-                      month: 'short',
-                      year: 'numeric'
-                    })}
-                  </span>
-                </div>
 
-                <div className='flex flex-1 flex-col gap-2'>
-                  <h3 className='text-lg font-bold text-[var(--color-text)]'>
-                    {m.name}
-                  </h3>
-                  <p className='text-sm font-semibold text-[var(--color-primary-dark)]'>
-                    📍 {m.area}, Hyderabad
-                  </p>
-                  {m.address && (
-                    <p className='text-sm text-[var(--color-text-secondary)]'>
-                      {m.address}
-                    </p>
-                  )}
-                  {m.description && (
-                    <p className='text-sm leading-6 text-[var(--color-text-secondary)]'>
-                      {m.description}
-                    </p>
-                  )}
-                  <p className='text-xs text-[var(--color-text-muted)]'>
-                    🗺️ {m.latitude.toFixed(5)}, {m.longitude.toFixed(5)}
-                  </p>
-                  {m.image_url && (
-                    <p className='text-xs text-[var(--color-text-muted)]'>
-                      📷 Image Attached:{' '}
-                      <code className='rounded bg-[var(--color-surface-muted)] px-1 py-0.5 text-[11px]'>
-                        {m.image_url}
-                      </code>
-                    </p>
-                  )}
-                </div>
+                  <div className='flex gap-3'>
+                    <div className='h-16 w-16 shrink-0 overflow-hidden rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-muted)]'>
+                      {image ? (
+                        <img
+                          src={image}
+                          alt={m.name}
+                          className='h-full w-full object-cover'
+                        />
+                      ) : (
+                        <div className='flex h-full w-full items-center justify-center text-xl text-[var(--color-text-muted)]'>
+                          🖼️
+                        </div>
+                      )}
+                    </div>
 
-                <div className='mt-5 flex flex-wrap gap-2 border-t border-[var(--color-border)] pt-4'>
-                  <button
-                    type='button'
-                    onClick={() => openInspectModal(m.id)}
-                    className='inline-flex items-center justify-center rounded-full border border-[var(--color-border)] bg-white px-3 py-2 text-xs font-semibold text-[var(--color-text)] transition hover:border-[var(--color-border-strong)]'
-                  >
-                    🔍 Inspect / Photo
-                  </button>
-                  <button
-                    type='button'
-                    onClick={() => openEditModal(m)}
-                    className='inline-flex items-center justify-center rounded-full border border-[var(--color-border)] bg-[var(--color-surface-muted)] px-3 py-2 text-xs font-semibold text-[var(--color-text)] transition hover:border-[var(--color-border-strong)]'
-                  >
-                    ✏️ Edit
-                  </button>
+                    <div className='min-w-0 flex-1'>
+                      <h3 className='text-base font-bold text-[var(--color-text)]'>
+                        {m.name}
+                      </h3>
 
-                  {m.status === 'pending' && (
-                    <>
-                      <button
-                        type='button'
-                        onClick={() => handleApprove(m.id)}
-                        className='inline-flex items-center justify-center rounded-full bg-emerald-600 px-3 py-2 text-xs font-semibold text-white transition hover:bg-emerald-700'
-                      >
-                        ✓ Approve
-                      </button>
-                      <button
-                        type='button'
-                        onClick={() => handleReject(m.id)}
-                        className='inline-flex items-center justify-center rounded-full border border-red-200 bg-white px-3 py-2 text-xs font-semibold text-red-600 transition hover:bg-red-50'
-                      >
-                        ✕ Reject
-                      </button>
-                    </>
-                  )}
+                      <p className='mt-1 text-sm font-semibold text-[var(--color-primary-dark)]'>
+                        📍 {m.area}
+                      </p>
 
-                  {m.status === 'approved' && (
-                    <>
-                      <button
-                        type='button'
-                        onClick={() => handleToggleVerified(m)}
-                        className='inline-flex items-center justify-center rounded-full border border-[var(--color-border)] bg-white px-3 py-2 text-xs font-semibold text-[var(--color-text-secondary)] transition hover:border-[var(--color-border-strong)] hover:text-[var(--color-text)]'
-                      >
-                        {m.is_verified ? 'Unverify' : '✓ Verify'}
-                      </button>
-                      <button
-                        type='button'
-                        onClick={() => handleToggleFeatured(m)}
-                        className='inline-flex items-center justify-center rounded-full border border-[var(--color-border)] bg-white px-3 py-2 text-xs font-semibold text-[var(--color-text-secondary)] transition hover:border-[var(--color-border-strong)] hover:text-[var(--color-text)]'
-                      >
-                        {m.is_featured ? 'Unfeature' : '⭐ Feature'}
-                      </button>
-                      <button
-                        type='button'
-                        onClick={() => handleReject(m.id)}
-                        className='inline-flex items-center justify-center rounded-full border border-red-200 bg-white px-3 py-2 text-xs font-semibold text-red-600 transition hover:bg-red-50'
-                      >
-                        ✕ Revoke
-                      </button>
-                    </>
-                  )}
+                      {m.address && (
+                        <p className='mt-1 text-xs text-[var(--color-text-secondary)]'>
+                          {m.address}
+                        </p>
+                      )}
 
-                  {m.status === 'rejected' && (
+                      {(m.is_verified || m.is_featured) && (
+                        <div className='mt-2 flex flex-wrap gap-1'>
+                          {m.is_verified && (
+                            <span className='rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold text-emerald-700'>
+                              Verified
+                            </span>
+                          )}
+                          {m.is_featured && (
+                            <span className='rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-semibold text-amber-700'>
+                              Featured
+                            </span>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className='mt-4 flex items-center justify-between border-t border-[var(--color-border)] pt-3'>
+                    <span className='text-[11px] font-medium text-[var(--color-text-muted)]'>
+                      Quick review
+                    </span>
                     <button
                       type='button'
-                      onClick={() => handleApprove(m.id)}
-                      className='inline-flex items-center justify-center rounded-full bg-emerald-600 px-3 py-2 text-xs font-semibold text-white transition hover:bg-emerald-700'
+                      onClick={event => {
+                        event.stopPropagation()
+                        openInspectModal(m.id)
+                      }}
+                      className='inline-flex items-center justify-center rounded-full border border-[var(--color-border)] bg-[var(--color-surface-muted)] px-3 py-1.5 text-xs font-semibold text-[var(--color-text)] transition hover:border-[var(--color-border-strong)]'
                     >
-                      ✓ Approve
+                      Review →
                     </button>
-                  )}
-
-                  <button
-                    type='button'
-                    onClick={() => handleDelete(m.id, m.name)}
-                    className='ml-auto inline-flex items-center justify-center rounded-full border border-red-200 bg-white px-3 py-2 text-xs font-semibold text-red-600 transition hover:bg-red-50'
-                  >
-                    🗑️ Delete
-                  </button>
+                  </div>
                 </div>
-              </div>
-            ))}
+              )
+            })}
           </div>
         )}
       </main>
 
       {inspectingMandapam && (
         <div
-          className='fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm'
+          className='fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-3 sm:p-4'
           onClick={() => setInspectingMandapam(null)}
         >
           <div
-            className='max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-3xl bg-white shadow-2xl'
-            onClick={e => e.stopPropagation()}
+            className='h-[min(820px,calc(100vh-32px))] w-full max-w-[1180px] overflow-hidden rounded-[24px] border border-[#E7E7E7] bg-white shadow-[0_24px_80px_rgba(15,23,42,0.18)] transition-all duration-200 ease-out'
+            onClick={event => event.stopPropagation()}
           >
-            <div className='flex items-center justify-between border-b border-[var(--color-border)] px-5 py-4'>
-              <h2 className='text-lg font-bold text-[var(--color-text)]'>
-                Inspect Submission: {inspectingMandapam.name}
-              </h2>
-              <button
-                type='button'
-                className='text-xl text-[var(--color-text-muted)] transition hover:text-[var(--color-text)]'
-                onClick={() => setInspectingMandapam(null)}
-              >
-                ✕
-              </button>
-            </div>
-
-            <div className='space-y-4 p-5'>
-              {inspectingMandapam.signed_image_url ? (
-                <div className='relative overflow-hidden rounded-[var(--radius-lg)] border border-[var(--color-border)]'>
-                  <img
-                    src={inspectingMandapam.signed_image_url}
-                    alt={inspectingMandapam.name}
-                    className='h-72 w-full object-contain bg-black'
-                  />
-                  <span className='absolute bottom-2 right-2 rounded bg-black/70 px-2 py-1 text-[10px] font-semibold text-emerald-300'>
-                    🔒 Secure Signed URL (5-min expiry)
-                  </span>
-                </div>
-              ) : inspectingMandapam.image_url ? (
-                <div className='rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[var(--color-surface-muted)] p-4 text-sm text-[var(--color-text-secondary)]'>
-                  <span>📷 Object path: {inspectingMandapam.image_url}</span>
-                  <p className='mt-2 text-xs text-[var(--color-text-muted)]'>
-                    Signed URL unavailable or storage object unreachable.
+            <div className='flex h-full min-h-0 flex-col'>
+              <header className='flex items-start justify-between gap-4 border-b border-[#E7E7E7] px-5 py-4 sm:px-6 lg:px-8'>
+                <div>
+                  <p className='text-[11px] font-semibold uppercase tracking-[0.12em] text-[#8A8A8A]'>
+                    Review Mandapam
                   </p>
+                  <h2 className='mt-1 text-2xl font-bold tracking-[-0.03em] text-[#171717]'>
+                    {inspectingMandapam.name}
+                  </h2>
+                </div>
+
+                <div className='flex items-center gap-3'>
+                  <div className='flex flex-wrap items-center gap-2'>
+                    <span
+                      className={[
+                        'inline-flex rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.08em]',
+                        inspectingMandapam.status === 'pending'
+                          ? 'bg-[#f2e7d5] text-[#8a5c1a]'
+                          : inspectingMandapam.status === 'approved'
+                          ? 'bg-[#dff6e8] text-[#166534]'
+                          : 'bg-[#f6d7d7] text-[#8a1f1f]'
+                      ].join(' ')}
+                    >
+                      {inspectingMandapam.status}
+                    </span>
+                    {inspectingMandapam.is_verified && (
+                      <span className='inline-flex items-center rounded-full bg-[#eaf5ee] px-2 py-0.5 text-[10px] font-semibold text-[#1b5c42]'>
+                        ✓ Verified
+                      </span>
+                    )}
+                  </div>
+
+                  <button
+                    type='button'
+                    aria-label='Close review modal'
+                    onClick={() => setInspectingMandapam(null)}
+                    className='inline-flex h-10 w-10 items-center justify-center rounded-full border border-[#E5E5E5] bg-white text-xl leading-none text-[#6A6A6A] transition hover:bg-[#F5F5F5] hover:text-[#171717]'
+                  >
+                    ×
+                  </button>
+                </div>
+              </header>
+
+              {isLoadingInspect ? (
+                <div className='flex min-h-[320px] items-center justify-center text-sm text-[#6A6A6A]'>
+                  Loading submission details…
                 </div>
               ) : (
-                <div className='rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[var(--color-surface-muted)] p-6 text-center text-[var(--color-text-secondary)]'>
-                  <span className='block text-5xl'>🕉️</span>
-                  <p className='mt-2'>
-                    No photo was uploaded with this submission.
-                  </p>
-                </div>
+                <>
+                  <div className='flex min-h-0 flex-1 flex-col overflow-hidden lg:flex-row'>
+                    <div className='flex min-h-0 flex-col border-b border-[#E7E7E7] bg-[#F7F7F5] p-4 sm:p-5 lg:max-w-[46%] lg:flex-[0_0_46%] lg:border-b-0 lg:border-r'>
+                      <div className='flex h-full min-h-[280px] flex-col overflow-hidden rounded-[18px] border border-[#E7E7E7] bg-white'>
+                        {selectedReviewImage ? (
+                          <img
+                            src={selectedReviewImage}
+                            alt={inspectingMandapam.name}
+                            className='h-[380px] w-full object-contain bg-white sm:h-[440px] lg:h-full'
+                          />
+                        ) : (
+                          <div className='flex h-full min-h-[280px] items-center justify-center text-center text-[#6A6A6A]'>
+                            <div>
+                              <div className='text-5xl'>🕉️</div>
+                              <p className='mt-2 text-sm'>No photo uploaded</p>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+
+                      {reviewImages.length > 1 && (
+                        <div className='mt-4 flex flex-wrap gap-2'>
+                          {reviewImages.map((image: string, index: number) => (
+                            <button
+                              key={`${image}-${index}`}
+                              type='button'
+                              onClick={() => setSelectedImageIndex(index)}
+                              className={[
+                                'h-16 w-16 overflow-hidden rounded-xl border bg-white transition',
+                                selectedImageIndex === index
+                                  ? 'border-[#171717] ring-2 ring-[#171717]/10'
+                                  : 'border-[#E5E5E5] hover:border-[#BDBDBD]'
+                              ].join(' ')}
+                              aria-label={`View image ${index + 1}`}
+                            >
+                              <img
+                                src={image}
+                                alt={`${inspectingMandapam.name} image ${
+                                  index + 1
+                                }`}
+                                className='h-full w-full object-cover'
+                              />
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
+                    <div className='min-h-0 flex-1 overflow-y-auto bg-white overscroll-contain'>
+                      <div className='space-y-6 px-5 py-5 sm:px-6 lg:px-8'>
+                        {reviewSections.map(section => (
+                          <section
+                            key={section.title}
+                            className='border-b border-[#E7E7E7] pb-6 last:border-b-0 last:pb-0'
+                          >
+                            <h3 className='text-[11px] font-semibold uppercase tracking-[0.12em] text-[#8A8A8A]'>
+                              {section.title}
+                            </h3>
+
+                            <div className='mt-4 grid gap-4 sm:grid-cols-2'>
+                              {section.items.map(item => {
+                                const isFullWidth = item.fullWidth
+                                const value = item.value
+
+                                if (!hasValue(value)) return null
+
+                                return (
+                                  <div
+                                    key={item.label}
+                                    className={
+                                      isFullWidth ? 'sm:col-span-2' : 'min-w-0'
+                                    }
+                                  >
+                                    <p className='text-[11px] font-semibold uppercase tracking-[0.08em] text-[#8A8A8A]'>
+                                      {item.label}
+                                    </p>
+
+                                    {item.label === 'Map' ? (
+                                      <a
+                                        href={String(value)}
+                                        target='_blank'
+                                        rel='noopener noreferrer'
+                                        className='mt-1 inline-flex text-[15px] text-[#171717] underline-offset-2 hover:underline'
+                                      >
+                                        Open in Google Maps
+                                      </a>
+                                    ) : item.label === 'Description' ? (
+                                      <p className='mt-1 text-[15px] leading-7 text-[#171717]'>
+                                        {typeof value === 'string'
+                                          ? value
+                                          : String(value)}
+                                      </p>
+                                    ) : (
+                                      <p className='mt-1 text-[15px] leading-6 text-[#171717]'>
+                                        {typeof value === 'string'
+                                          ? value
+                                          : String(value)}
+                                      </p>
+                                    )}
+                                  </div>
+                                )
+                              })}
+                            </div>
+                          </section>
+                        ))}
+
+                        <details className='overflow-hidden rounded-[16px] border border-[#E7E7E7] bg-[#F7F7F5]'>
+                          <summary className='cursor-pointer list-none px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.12em] text-[#8A8A8A]'>
+                            Technical details
+                          </summary>
+
+                          <div className='grid gap-4 border-t border-[#E7E7E7] px-4 py-4 sm:grid-cols-2'>
+                            <div>
+                              <p className='text-[11px] font-semibold uppercase tracking-[0.08em] text-[#8A8A8A]'>
+                                Record ID
+                              </p>
+                              <p className='mt-1 text-[15px] text-[#171717]'>
+                                {inspectingMandapam.id}
+                              </p>
+                            </div>
+                            <div>
+                              <p className='text-[11px] font-semibold uppercase tracking-[0.08em] text-[#8A8A8A]'>
+                                Created
+                              </p>
+                              <p className='mt-1 text-[15px] text-[#171717]'>
+                                {formatDateTime(inspectingMandapam.created_at)}
+                              </p>
+                            </div>
+                            <div>
+                              <p className='text-[11px] font-semibold uppercase tracking-[0.08em] text-[#8A8A8A]'>
+                                Updated
+                              </p>
+                              <p className='mt-1 text-[15px] text-[#171717]'>
+                                {formatDateTime(inspectingMandapam.updated_at)}
+                              </p>
+                            </div>
+                            <div>
+                              <p className='text-[11px] font-semibold uppercase tracking-[0.08em] text-[#8A8A8A]'>
+                                Image path
+                              </p>
+                              <p className='mt-1 break-all text-[15px] text-[#171717]'>
+                                {inspectingMandapam.image_url ||
+                                  'No image path'}
+                              </p>
+                            </div>
+                          </div>
+                        </details>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className='flex-shrink-0 border-t border-[#E7E7E7] bg-white p-4 sm:p-5'>
+                    <div className='flex flex-wrap items-center gap-2'>
+                      <button
+                        type='button'
+                        onClick={() => openEditModal(inspectingMandapam)}
+                        className='inline-flex items-center justify-center rounded-full border border-[#E5E5E5] bg-white px-4 py-2 text-sm font-semibold text-[#222222] transition hover:bg-[#F5F5F5]'
+                      >
+                        Edit
+                      </button>
+
+                      {inspectingMandapam.status === 'pending' ? (
+                        <>
+                          <button
+                            type='button'
+                            onClick={() => handleApprove(inspectingMandapam.id)}
+                            className='inline-flex items-center justify-center rounded-full bg-[#171717] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#2B2B2B]'
+                          >
+                            Approve
+                          </button>
+                          <button
+                            type='button'
+                            onClick={() =>
+                              handleReject(
+                                inspectingMandapam.id,
+                                inspectingMandapam.name
+                              )
+                            }
+                            className='inline-flex items-center justify-center rounded-full border border-[#F1C0C0] bg-white px-4 py-2 text-sm font-semibold text-[#B42318] transition hover:bg-[#FFF1F1]'
+                          >
+                            Reject
+                          </button>
+                        </>
+                      ) : (
+                        <>
+                          <button
+                            type='button'
+                            onClick={() =>
+                              handleToggleVerified(inspectingMandapam)
+                            }
+                            className='inline-flex items-center justify-center rounded-full border border-[#E5E5E5] bg-white px-4 py-2 text-sm font-semibold text-[#222222] transition hover:bg-[#F5F5F5]'
+                          >
+                            {inspectingMandapam.is_verified
+                              ? 'Unverify'
+                              : 'Verify'}
+                          </button>
+                          <button
+                            type='button'
+                            onClick={() =>
+                              handleToggleFeatured(inspectingMandapam)
+                            }
+                            className='inline-flex items-center justify-center rounded-full border border-[#E5E5E5] bg-white px-4 py-2 text-sm font-semibold text-[#222222] transition hover:bg-[#F5F5F5]'
+                          >
+                            {inspectingMandapam.is_featured
+                              ? 'Unfeature'
+                              : 'Feature'}
+                          </button>
+                          <button
+                            type='button'
+                            onClick={() =>
+                              handleReject(
+                                inspectingMandapam.id,
+                                inspectingMandapam.name
+                              )
+                            }
+                            className='inline-flex items-center justify-center rounded-full border border-[#F1C0C0] bg-white px-4 py-2 text-sm font-semibold text-[#B42318] transition hover:bg-[#FFF1F1]'
+                          >
+                            {inspectingMandapam.status === 'approved'
+                              ? 'Revoke'
+                              : 'Reject'}
+                          </button>
+                        </>
+                      )}
+
+                      <button
+                        type='button'
+                        onClick={() =>
+                          handleDelete(
+                            inspectingMandapam.id,
+                            inspectingMandapam.name
+                          )
+                        }
+                        className='ml-auto inline-flex items-center justify-center rounded-full border border-[#F1C0C0] bg-[#FFF1F1] px-4 py-2 text-sm font-semibold text-[#B42318] transition hover:bg-[#FFE1E1]'
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  </div>
+                </>
               )}
-
-              <div className='space-y-2 text-sm text-[var(--color-text-secondary)]'>
-                <p>
-                  <strong className='text-[var(--color-text)]'>Area:</strong>{' '}
-                  {inspectingMandapam.area}
-                </p>
-                <p>
-                  <strong className='text-[var(--color-text)]'>Address:</strong>{' '}
-                  {inspectingMandapam.address || 'Not provided'}
-                </p>
-                <p>
-                  <strong className='text-[var(--color-text)]'>
-                    Description:
-                  </strong>{' '}
-                  {inspectingMandapam.description || 'Not provided'}
-                </p>
-                <p>
-                  <strong className='text-[var(--color-text)]'>
-                    Coordinates:
-                  </strong>{' '}
-                  {inspectingMandapam.latitude}, {inspectingMandapam.longitude}
-                </p>
-                <p>
-                  <strong className='text-[var(--color-text)]'>Status:</strong>{' '}
-                  {inspectingMandapam.status}
-                </p>
-                <p>
-                  <strong className='text-[var(--color-text)]'>
-                    Submitted:
-                  </strong>{' '}
-                  {new Date(inspectingMandapam.created_at).toLocaleString()}
-                </p>
-              </div>
-            </div>
-
-            <div className='flex justify-end border-t border-[var(--color-border)] px-5 py-4'>
-              <button
-                type='button'
-                onClick={() => setInspectingMandapam(null)}
-                className='inline-flex items-center justify-center rounded-full border border-[var(--color-border)] bg-[var(--color-surface-muted)] px-4 py-2 text-sm font-semibold text-[var(--color-text)] transition hover:border-[var(--color-border-strong)]'
-              >
-                Close
-              </button>
             </div>
           </div>
         </div>
@@ -562,7 +956,7 @@ export function AdminDashboardPage () {
         >
           <div
             className='max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-3xl bg-white shadow-2xl'
-            onClick={e => e.stopPropagation()}
+            onClick={event => event.stopPropagation()}
           >
             <div className='flex items-center justify-between border-b border-[var(--color-border)] px-5 py-4'>
               <h2 className='text-lg font-bold text-[var(--color-text)]'>
