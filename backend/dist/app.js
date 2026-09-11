@@ -7,6 +7,7 @@ exports.createApp = createApp;
 const express_1 = __importDefault(require("express"));
 const cors_1 = __importDefault(require("cors"));
 const helmet_1 = __importDefault(require("helmet"));
+const compression_1 = __importDefault(require("compression"));
 const cookie_parser_1 = __importDefault(require("cookie-parser"));
 const path_1 = __importDefault(require("path"));
 const fs_1 = __importDefault(require("fs"));
@@ -14,9 +15,16 @@ const mandapams_routes_js_1 = __importDefault(require("./routes/mandapams.routes
 const admin_routes_js_1 = __importDefault(require("./routes/admin.routes.js"));
 function createApp() {
     const app = (0, express_1.default)();
+    // Trust first upstream reverse proxy (Render, Railway, Fly.io, Cloudflare)
+    // Ensures req.ip correctly identifies client IP for rate limiters without allowing client spoofing
+    app.set('trust proxy', 1);
     // Security headers via Helmet (allow cross-origin for local asset images)
     app.use((0, helmet_1.default)({
         crossOriginResourcePolicy: { policy: 'cross-origin' },
+    }));
+    // HTTP response compression (skip responses < 1KB or already compressed image media)
+    app.use((0, compression_1.default)({
+        threshold: 1024,
     }));
     // Hardened CORS: allow development origin and any configured in CORS_ORIGIN
     const allowedOrigins = new Set(['http://localhost:5173']);
@@ -52,8 +60,9 @@ function createApp() {
     }
     app.use('/api/uploads', express_1.default.static(uploadsDir));
     app.use('/uploads', express_1.default.static(uploadsDir));
-    // Health check
+    // Health check (explicitly not cached)
     app.get('/api/health', (_req, res) => {
+        res.set('Cache-Control', 'no-store');
         res.json({
             status: 'ok',
             service: 'ganesh-darshan-backend',

@@ -59,10 +59,15 @@ function validateEnvironment() {
         process.exit(1);
     }
 }
+let _cachedAdminJwtSecret = null;
 function getAdminJwtSecret() {
+    if (_cachedAdminJwtSecret) {
+        return _cachedAdminJwtSecret;
+    }
     const secret = process.env.ADMIN_JWT_SECRET?.trim();
     if (!secret || secret === INSECURE_FALLBACK_JWT_SECRET) {
         throw new Error('ADMIN_JWT_SECRET is invalid or not configured.');
     }
-    return secret;
+    _cachedAdminJwtSecret = secret;
+    return _cachedAdminJwtSecret;
 }

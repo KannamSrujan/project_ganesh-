@@ -35,8 +35,8 @@ function handleServiceError(res, error, fallbackMessage = 'Internal server error
  */
 async function adminLogin(req, res) {
     const { email, password } = req.body;
-    const configuredEmail = process.env.ADMIN_EMAIL;
-    const configuredPassword = process.env.ADMIN_PASSWORD;
+    const configuredEmail = process.env.ADMIN_EMAIL?.trim();
+    const configuredPassword = process.env.ADMIN_PASSWORD?.trim();
     if (!email || !password) {
         res
             .status(400)

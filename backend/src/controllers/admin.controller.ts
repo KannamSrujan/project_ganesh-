@@ -38,8 +38,8 @@ function handleServiceError (
 export async function adminLogin (req: Request, res: Response): Promise<void> {
   const { email, password } = req.body
 
-  const configuredEmail = process.env.ADMIN_EMAIL
-  const configuredPassword = process.env.ADMIN_PASSWORD
+  const configuredEmail = process.env.ADMIN_EMAIL?.trim()
+  const configuredPassword = process.env.ADMIN_PASSWORD?.trim()
 
   if (!email || !password) {
     res

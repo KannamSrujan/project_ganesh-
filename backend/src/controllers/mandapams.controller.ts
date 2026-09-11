@@ -36,6 +36,7 @@ export async function getApprovedMandapams (
       typeof search === 'string' ? search : undefined
     )
 
+    res.set('Cache-Control', 'public, max-age=30, stale-while-revalidate=60');
     res.json({ success: true, data })
   } catch (error) {
     console.error('[mandapams.controller] getApprovedMandapams error:', error)
@@ -53,6 +54,7 @@ export async function getFeaturedMandapams (
 ): Promise<void> {
   try {
     const data = await listFeaturedMandapams()
+    res.set('Cache-Control', 'public, max-age=60, stale-while-revalidate=120');
     res.json({ success: true, data })
   } catch (error) {
     console.error('[mandapams.controller] getFeaturedMandapams error:', error)
@@ -73,6 +75,7 @@ export async function getMandapamById (
     const id = Array.isArray(rawId) ? rawId[0] : rawId
     const data = await getMandapamByIdService(id ?? '')
 
+    res.set('Cache-Control', 'public, max-age=60');
     res.json({ success: true, data })
   } catch (error) {
     handleServiceError(res, error, 'Failed to fetch mandapam details.')

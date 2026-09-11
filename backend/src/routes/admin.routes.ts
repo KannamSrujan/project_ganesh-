@@ -18,6 +18,12 @@ import {
 
 const router = Router();
 
+// Ensure all admin responses are never cached by intermediaries or browsers
+router.use((_req, res, next) => {
+  res.set('Cache-Control', 'no-store, private');
+  next();
+});
+
 // Rate limiter for admin login: 5 failed attempts per 15 min per IP
 const adminLoginLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
