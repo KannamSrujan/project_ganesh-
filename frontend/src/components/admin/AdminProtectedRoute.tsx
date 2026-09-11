@@ -1,38 +1,40 @@
-import { useEffect, useState, ReactNode } from 'react';
-import { Navigate } from 'react-router-dom';
-import { checkAdminAuth } from '../../services/adminApi';
+import { useEffect, useState, ReactNode } from 'react'
+import { Navigate } from 'react-router-dom'
+import { checkAdminAuth } from '../../services/adminApi'
 
 interface AdminProtectedRouteProps {
-  children: ReactNode;
+  children: ReactNode
 }
 
-export function AdminProtectedRoute({ children }: AdminProtectedRouteProps) {
-  const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
+export function AdminProtectedRoute ({ children }: AdminProtectedRouteProps) {
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null)
 
   useEffect(() => {
-    let mounted = true;
-    checkAdminAuth().then((res) => {
+    let mounted = true
+    checkAdminAuth().then(res => {
       if (mounted) {
-        setIsAuthenticated(res.authenticated);
+        setIsAuthenticated(res.authenticated)
       }
-    });
+    })
     return () => {
-      mounted = false;
-    };
-  }, []);
+      mounted = false
+    }
+  }, [])
 
   if (isAuthenticated === null) {
     return (
-      <div className="empty-state" style={{ minHeight: '60vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
-        <span className="empty-state-icon">🔒</span>
-        <p className="empty-state-text">Verifying admin session…</p>
+      <div className='flex min-h-[60vh] flex-col items-center justify-center gap-3 px-4 text-center text-[var(--color-text-secondary)]'>
+        <span className='text-5xl opacity-60' aria-hidden='true'>
+          🔒
+        </span>
+        <p className='text-base font-medium'>Verifying admin session…</p>
       </div>
-    );
+    )
   }
 
   if (!isAuthenticated) {
-    return <Navigate to="/admin/login" replace />;
+    return <Navigate to='/admin/login' replace />
   }
 
-  return <>{children}</>;
+  return <>{children}</>
 }

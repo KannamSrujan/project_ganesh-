@@ -1,167 +1,181 @@
-import { useEffect, useState } from 'react';
-import { useParams, Link } from 'react-router-dom';
-import { SiteHeader } from '../components/ui/SiteHeader';
-import { Badge } from '../components/ui/Badge';
-import { ShareButton } from '../components/mandapam/ShareButton';
-import { SingleMandapamMapWrapper } from '../components/mandapam/SingleMandapamMapWrapper';
-import { resolveImageUrl } from '../utils/imageUrl';
-import { fetchMandapamById } from '../services/api';
-import type { Mandapam } from '../types/mandapam';
+import { useEffect } from 'react'
+import { useParams, Link } from 'react-router-dom'
+import { SiteHeader } from '../components/ui/SiteHeader'
+import { Badge } from '../components/ui/Badge'
+import { ShareButton } from '../components/mandapam/ShareButton'
+import { SingleMandapamMapWrapper } from '../components/mandapam/SingleMandapamMapWrapper'
+import { resolveImageUrl } from '../utils/imageUrl'
+import { useAppDispatch, useAppSelector } from '../hooks/redux'
+import {
+  clearSingleMandapam,
+  loadMandapamById
+} from '../features/mandapams/mandapamsSlice'
 
-export function MandapamDetailPage() {
-  const { id } = useParams<{ id: string }>();
-  const [mandapam, setMandapam] = useState<Mandapam | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [notFound, setNotFound] = useState(false);
+export function MandapamDetailPage () {
+  const { id } = useParams<{ id: string }>()
+  const dispatch = useAppDispatch()
+  const { singleMandapam, loadingSingle, singleError } = useAppSelector(
+    state => state.mandapams
+  )
 
   useEffect(() => {
-    let mounted = true;
-
-    async function loadMandapam() {
-      if (!id) {
-        setNotFound(true);
-        setLoading(false);
-        return;
-      }
-
-      setLoading(true);
-      try {
-        const data = await fetchMandapamById(id);
-        if (!mounted) return;
-
-        if (!data || data.status !== 'approved') {
-          setNotFound(true);
-        } else {
-          setMandapam(data);
-          document.title = `${data.name} | Ganesh Darshan Hyderabad`;
-        }
-      } catch {
-        if (mounted) setNotFound(true);
-      } finally {
-        if (mounted) setLoading(false);
-      }
+    if (!id) {
+      dispatch(clearSingleMandapam())
+      return
     }
 
-    loadMandapam();
+    dispatch(loadMandapamById(id))
 
     return () => {
-      mounted = false;
-    };
-  }, [id]);
+      dispatch(clearSingleMandapam())
+    }
+  }, [dispatch, id])
 
-  if (loading) {
+  if (loadingSingle) {
     return (
       <>
         <SiteHeader />
-        <div className="empty-state" style={{ minHeight: '60vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
-          <span className="empty-state-icon">🕉️</span>
-          <p className="empty-state-text">Loading mandapam details…</p>
+        <div className='flex min-h-[60vh] flex-col items-center justify-center gap-3 px-4 text-center text-[var(--color-text-secondary)]'>
+          <span className='text-5xl opacity-70' aria-hidden='true'>
+            🕉️
+          </span>
+          <p className='text-base font-medium'>Loading mandapam details…</p>
         </div>
       </>
-    );
+    )
   }
 
-  if (notFound || !mandapam) {
+  if (singleError || !singleMandapam) {
     return (
       <>
         <SiteHeader />
-        <main className="detail-page">
-          <div className="empty-state" style={{ minHeight: '60vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
-            <span className="empty-state-icon">🔍</span>
-            <h2>Mandapam Not Found</h2>
-            <p className="empty-state-text">
-              The requested Ganesh mandapam could not be found or has not been verified yet.
+        <main className='flex-1 pb-16'>
+          <div className='mx-auto flex min-h-[60vh] max-w-2xl flex-col items-center justify-center gap-4 px-4 text-center'>
+            <span className='text-5xl opacity-60' aria-hidden='true'>
+              🔍
+            </span>
+            <h2 className='text-2xl font-bold text-[var(--color-text)]'>
+              Mandapam Not Found
+            </h2>
+            <p className='text-base text-[var(--color-text-secondary)]'>
+              The requested Ganesh mandapam could not be found or has not been
+              verified yet.
             </p>
-            <Link to="/" className="btn btn-primary mt-4">
+            <Link
+              to='/'
+              className='mt-2 inline-flex items-center justify-center rounded-full bg-[var(--color-primary)] px-5 py-3 text-sm font-semibold text-white transition hover:bg-[var(--color-primary-dark)]'
+            >
               ← Back to Explore
             </Link>
           </div>
         </main>
       </>
-    );
+    )
   }
 
-  const directionsUrl = `https://www.google.com/maps/dir/?api=1&destination=${mandapam.latitude},${mandapam.longitude}`;
-  const displayImage = resolveImageUrl(mandapam.image_url);
+  const mandapam = singleMandapam
+
+  if (!mandapam) {
+    return null
+  }
+
+  const directionsUrl = `https://www.google.com/maps/dir/?api=1&destination=${mandapam.latitude},${mandapam.longitude}`
+  const displayImage = resolveImageUrl(mandapam.image_url)
 
   return (
     <>
       <SiteHeader />
 
-      {/* Sub-nav back bar */}
-      <nav className="detail-nav-bar" aria-label="Breadcrumb">
-        <div className="container">
-          <Link to="/" className="detail-back-link">
+      <nav
+        className='border-b border-[var(--color-border)] bg-[var(--color-surface-muted)]'
+        aria-label='Breadcrumb'
+      >
+        <div className='container py-3'>
+          <Link
+            to='/'
+            className='inline-flex items-center gap-2 text-sm font-semibold text-[var(--color-text-secondary)] transition hover:text-[var(--color-text)]'
+          >
             ← Explore Mandapams
           </Link>
         </div>
       </nav>
 
-      <main className="detail-page">
-        <article className="detail-container">
-          {/* 1. HERO IMAGE */}
-          <div className="detail-hero-wrapper">
+      <main className='flex-1 bg-white pb-16'>
+        <article className='mx-auto flex max-w-4xl flex-col gap-8 px-4 pt-6 sm:px-6 lg:px-8'>
+          <div className='relative aspect-[16/9] overflow-hidden rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[var(--color-surface-muted)]'>
             {displayImage ? (
               <img
                 src={displayImage}
                 alt={mandapam.name}
-                className="detail-hero-img"
+                className='h-full w-full object-cover'
               />
             ) : (
-              <div className="detail-hero-fallback" aria-hidden="true">
-                <span className="detail-hero-fallback-icon">🕉️</span>
+              <div
+                className='flex h-full w-full items-center justify-center bg-[var(--color-surface-muted)]'
+                aria-hidden='true'
+              >
+                <span className='text-6xl opacity-70'>🕉️</span>
               </div>
             )}
           </div>
 
-          {/* 2. TITLE & BADGES */}
-          <div className="detail-header-block">
-            <div className="detail-badges-row">
+          <div className='flex flex-col gap-3'>
+            <div className='flex flex-wrap items-center gap-2'>
               {mandapam.is_featured && (
-                <Badge variant="featured">⭐ Featured Mandapam</Badge>
+                <Badge variant='featured'>Featured Mandapam</Badge>
               )}
               {mandapam.is_verified && (
-                <Badge variant="verified">✓ Verified</Badge>
+                <Badge variant='verified'>Verified</Badge>
               )}
             </div>
 
-            <h1 className="detail-title">{mandapam.name}</h1>
+            <h1 className='text-3xl font-extrabold tracking-[-0.05em] text-[var(--color-text)] sm:text-4xl'>
+              {mandapam.name}
+            </h1>
           </div>
 
-          {/* 3. LOCATION BLOCK */}
-          <section className="detail-location-card" aria-label="Location details">
-            <div className="detail-location-primary">
-              <span className="detail-location-pin" aria-hidden="true">
+          <section
+            className='rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-white p-5'
+            aria-label='Location details'
+          >
+            <div className='flex items-center gap-3 text-lg font-bold text-[var(--color-text)]'>
+              <span className='text-xl' aria-hidden='true'>
                 📍
               </span>
               <span>{mandapam.area}, Hyderabad</span>
             </div>
             {mandapam.address && (
-              <p className="detail-location-address">{mandapam.address}</p>
+              <p className='mt-2 pl-8 text-sm leading-6 text-[var(--color-text-secondary)]'>
+                {mandapam.address}
+              </p>
             )}
           </section>
 
-          {/* 4. PRIMARY ACTIONS */}
-          <div className="detail-actions" aria-label="Primary actions">
+          <div className='flex flex-wrap gap-3' aria-label='Primary actions'>
             <a
               href={directionsUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="btn btn-primary btn-large"
+              target='_blank'
+              rel='noopener noreferrer'
+              className='inline-flex flex-1 items-center justify-center rounded-full bg-[var(--color-primary)] px-5 py-3 text-sm font-semibold text-white transition hover:bg-[var(--color-primary-dark)] sm:flex-none'
               aria-label={`Get directions to ${mandapam.name} on Google Maps`}
             >
-              📍 Get Directions
+              Get Directions
             </a>
             <ShareButton
               mandapamName={mandapam.name}
               area={mandapam.area}
-              className="btn btn-secondary btn-large"
+              className='inline-flex flex-1 items-center justify-center rounded-full border border-[var(--color-border)] bg-[var(--color-surface-muted)] px-5 py-3 text-sm font-semibold text-[var(--color-text)] transition hover:border-[var(--color-border-strong)] sm:flex-none'
             />
           </div>
 
-          {/* 5. INDIVIDUAL MAP */}
-          <section className="detail-section" aria-label="Mandapam map location">
-            <h2 className="detail-section-title">🗺️ Location Map</h2>
+          <section
+            className='flex flex-col gap-3'
+            aria-label='Mandapam map location'
+          >
+            <h2 className='flex items-center gap-2 text-xl font-bold text-[var(--color-text)]'>
+              <span aria-hidden='true'>🗺️</span>
+              <span>Location Map</span>
+            </h2>
             <SingleMandapamMapWrapper
               latitude={mandapam.latitude}
               longitude={mandapam.longitude}
@@ -170,50 +184,63 @@ export function MandapamDetailPage() {
             />
           </section>
 
-          {/* 6. DESCRIPTION / ABOUT */}
           {mandapam.description && (
-            <section className="detail-section" aria-label="About this mandapam">
-              <h2 className="detail-section-title">ℹ️ About this Mandapam</h2>
-              <div className="detail-about-card">
-                <p className="detail-about-text">{mandapam.description}</p>
+            <section
+              className='flex flex-col gap-3'
+              aria-label='About this mandapam'
+            >
+              <h2 className='flex items-center gap-2 text-xl font-bold text-[var(--color-text)]'>
+                <span aria-hidden='true'>ℹ️</span>
+                <span>About this Mandapam</span>
+              </h2>
+              <div className='rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-white p-5'>
+                <p className='whitespace-pre-line text-[0.98rem] leading-7 text-[var(--color-text-secondary)]'>
+                  {mandapam.description}
+                </p>
               </div>
             </section>
           )}
 
-          {/* 7. SHARE INVITE CARD */}
-          <section className="detail-share-card" aria-label="Share with others">
-            <div className="detail-share-content">
-              <h2 className="detail-share-title">Visiting with family & friends?</h2>
-              <p className="detail-share-subtext">
+          <section
+            className='flex flex-col gap-4 rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[var(--color-surface-muted)] p-5 sm:flex-row sm:items-center sm:justify-between'
+            aria-label='Share with others'
+          >
+            <div className='flex flex-col gap-1'>
+              <h2 className='text-base font-bold text-[var(--color-text)]'>
+                Visiting with family & friends?
+              </h2>
+              <p className='text-sm text-[var(--color-text-secondary)]'>
                 Share this mandapam location and darshan details easily.
               </p>
             </div>
             <ShareButton
               mandapamName={mandapam.name}
               area={mandapam.area}
-              className="btn btn-primary btn-sm"
+              className='inline-flex items-center justify-center rounded-full bg-[var(--color-primary)] px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-[var(--color-primary-dark)]'
             />
           </section>
 
-          {/* 8. EXPLORE MORE CTA */}
-          <div className="detail-bottom-cta">
-            <Link to="/" className="btn btn-outline">
+          <div className='text-center'>
+            <Link
+              to='/'
+              className='inline-flex items-center justify-center rounded-full border border-[var(--color-border)] bg-white px-5 py-3 text-sm font-semibold text-[var(--color-text)] transition hover:border-[var(--color-border-strong)]'
+            >
               ← Back to All Mandapams
             </Link>
           </div>
         </article>
       </main>
 
-      <footer className="site-footer">
-        <div className="container footer-inner">
-          <p className="footer-text">
+      <footer className='border-t border-[var(--color-border)] bg-white'>
+        <div className='container flex flex-col items-center gap-1 py-7 text-center'>
+          <p className='text-sm font-semibold text-[var(--color-text)]'>
             © {new Date().getFullYear()} Ganesh Darshan Hyderabad
           </p>
-          <p className="footer-subtext">
+          <p className='text-xs text-[var(--color-text-muted)]'>
             Community-driven directory of Ganesh mandapams across Hyderabad.
           </p>
         </div>
       </footer>
     </>
-  );
+  )
 }

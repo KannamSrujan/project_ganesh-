@@ -1,158 +1,162 @@
-import { useState, useRef, useEffect, ChangeEvent } from 'react';
+import { useState, useRef, useEffect, ChangeEvent } from 'react'
 
-const MAX_FILE_SIZE_BYTES = 5 * 1024 * 1024; // 5 MB
-const ALLOWED_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
-const ALLOWED_EXTENSIONS = ['jpg', 'jpeg', 'png', 'webp'];
+const MAX_FILE_SIZE_BYTES = 5 * 1024 * 1024 // 5 MB
+const ALLOWED_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp']
+const ALLOWED_EXTENSIONS = ['jpg', 'jpeg', 'png', 'webp']
 
 interface ImageUploadProps {
-  file: File | null;
-  onFileChange: (file: File | null) => void;
-  error?: string | null;
+  file: File | null
+  onFileChange: (file: File | null) => void
+  error?: string | null
 }
 
-export function ImageUpload({ file, onFileChange, error }: ImageUploadProps) {
-  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
-  const [validationError, setValidationError] = useState<string | null>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const objectUrlRef = useRef<string | null>(null);
+export function ImageUpload ({ file, onFileChange, error }: ImageUploadProps) {
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null)
+  const [validationError, setValidationError] = useState<string | null>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
+  const objectUrlRef = useRef<string | null>(null)
 
   // Clean up object URL when component unmounts
   useEffect(() => {
     return () => {
       if (objectUrlRef.current) {
-        URL.revokeObjectURL(objectUrlRef.current);
+        URL.revokeObjectURL(objectUrlRef.current)
       }
-    };
-  }, []);
+    }
+  }, [])
 
   const validateAndSetFile = (selectedFile: File | null) => {
-    setValidationError(null);
+    setValidationError(null)
 
     // Clean up previous preview URL
     if (objectUrlRef.current) {
-      URL.revokeObjectURL(objectUrlRef.current);
-      objectUrlRef.current = null;
+      URL.revokeObjectURL(objectUrlRef.current)
+      objectUrlRef.current = null
     }
 
     if (!selectedFile) {
-      setPreviewUrl(null);
-      onFileChange(null);
-      return;
+      setPreviewUrl(null)
+      onFileChange(null)
+      return
     }
 
     // Check size
     if (selectedFile.size > MAX_FILE_SIZE_BYTES) {
-      setValidationError('Image exceeds 5 MB. Please select a smaller photo.');
-      setPreviewUrl(null);
-      onFileChange(null);
-      if (fileInputRef.current) fileInputRef.current.value = '';
-      return;
+      setValidationError('Image exceeds 5 MB. Please select a smaller photo.')
+      setPreviewUrl(null)
+      onFileChange(null)
+      if (fileInputRef.current) fileInputRef.current.value = ''
+      return
     }
 
     // Check MIME type
     if (!ALLOWED_MIME_TYPES.includes(selectedFile.type)) {
       setValidationError(
-        'Invalid image format. Only JPEG, PNG, and WebP images are allowed.',
-      );
-      setPreviewUrl(null);
-      onFileChange(null);
-      if (fileInputRef.current) fileInputRef.current.value = '';
-      return;
+        'Invalid image format. Only JPEG, PNG, and WebP images are allowed.'
+      )
+      setPreviewUrl(null)
+      onFileChange(null)
+      if (fileInputRef.current) fileInputRef.current.value = ''
+      return
     }
 
     // Check file extension
-    const ext = selectedFile.name.split('.').pop()?.toLowerCase();
+    const ext = selectedFile.name.split('.').pop()?.toLowerCase()
     if (!ext || !ALLOWED_EXTENSIONS.includes(ext)) {
       setValidationError(
-        'Invalid file extension. Allowed: .jpg, .jpeg, .png, .webp',
-      );
-      setPreviewUrl(null);
-      onFileChange(null);
-      if (fileInputRef.current) fileInputRef.current.value = '';
-      return;
+        'Invalid file extension. Allowed: .jpg, .jpeg, .png, .webp'
+      )
+      setPreviewUrl(null)
+      onFileChange(null)
+      if (fileInputRef.current) fileInputRef.current.value = ''
+      return
     }
 
-    const newUrl = URL.createObjectURL(selectedFile);
-    objectUrlRef.current = newUrl;
-    setPreviewUrl(newUrl);
-    onFileChange(selectedFile);
-  };
+    const newUrl = URL.createObjectURL(selectedFile)
+    objectUrlRef.current = newUrl
+    setPreviewUrl(newUrl)
+    onFileChange(selectedFile)
+  }
 
   const handleInputChange = (e: ChangeEvent<HTMLInputElement>) => {
-    const selected = e.target.files?.[0] ?? null;
-    validateAndSetFile(selected);
-  };
+    const selected = e.target.files?.[0] ?? null
+    validateAndSetFile(selected)
+  }
 
   const handleRemove = () => {
     if (objectUrlRef.current) {
-      URL.revokeObjectURL(objectUrlRef.current);
-      objectUrlRef.current = null;
+      URL.revokeObjectURL(objectUrlRef.current)
+      objectUrlRef.current = null
     }
-    setPreviewUrl(null);
-    onFileChange(null);
-    setValidationError(null);
+    setPreviewUrl(null)
+    onFileChange(null)
+    setValidationError(null)
     if (fileInputRef.current) {
-      fileInputRef.current.value = '';
+      fileInputRef.current.value = ''
     }
-  };
+  }
 
-  const displayError = validationError || error;
+  const displayError = validationError || error
 
   return (
-    <div className="image-upload-wrapper">
+    <div className='flex flex-col gap-2'>
       <input
         ref={fileInputRef}
-        type="file"
-        id="mandapam-photo"
-        accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp"
+        type='file'
+        id='mandapam-photo'
+        accept='.jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp'
         onChange={handleInputChange}
-        className="sr-only"
-        aria-label="Upload mandapam photo"
+        className='sr-only'
+        aria-label='Upload mandapam photo'
       />
 
       {!previewUrl ? (
         <label
-          htmlFor="mandapam-photo"
-          className="image-dropzone"
+          htmlFor='mandapam-photo'
+          className='flex cursor-pointer flex-col items-center justify-center gap-2 rounded-[var(--radius-lg)] border-2 border-dashed border-[var(--color-border)] bg-[var(--color-surface-muted)] p-6 text-center transition hover:border-[var(--color-border-strong)] focus:outline-none focus:ring-4 focus:ring-[var(--color-primary-soft)]'
           tabIndex={0}
-          onKeyDown={(e) => {
+          onKeyDown={e => {
             if (e.key === 'Enter' || e.key === ' ') {
-              e.preventDefault();
-              fileInputRef.current?.click();
+              e.preventDefault()
+              fileInputRef.current?.click()
             }
           }}
         >
-          <span className="image-dropzone-icon" aria-hidden="true">
+          <span className='text-3xl leading-none' aria-hidden='true'>
             📷
           </span>
-          <span className="image-dropzone-title">Click to upload photo</span>
-          <span className="image-dropzone-sub">
+          <span className='text-sm font-semibold text-[var(--color-text)]'>
+            Click to upload photo
+          </span>
+          <span className='text-xs text-[var(--color-text-muted)]'>
             JPEG, PNG, or WebP • Max 5 MB
           </span>
         </label>
       ) : (
-        <div className="image-preview-card">
+        <div className='flex items-center gap-4 rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[var(--color-surface-muted)] p-3'>
           <img
             src={previewUrl}
-            alt="Selected mandapam preview"
-            className="image-preview-thumb"
+            alt='Selected mandapam preview'
+            className='h-20 w-20 rounded-[var(--radius-md)] border border-[var(--color-border)] object-cover'
           />
-          <div className="image-preview-info">
-            <span className="image-preview-name">{file?.name}</span>
-            <span className="image-preview-size">
+          <div className='min-w-0 flex-1'>
+            <span className='block truncate text-sm font-semibold text-[var(--color-text)]'>
+              {file?.name}
+            </span>
+            <span className='text-xs text-[var(--color-text-muted)]'>
               {file ? `${(file.size / (1024 * 1024)).toFixed(2)} MB` : ''}
             </span>
-            <div className="image-preview-actions">
+            <div className='mt-2 flex flex-wrap gap-2'>
               <label
-                htmlFor="mandapam-photo"
-                className="btn btn-secondary btn-sm"
+                htmlFor='mandapam-photo'
+                className='inline-flex items-center justify-center rounded-full border border-[var(--color-border)] bg-white px-3 py-1.5 text-xs font-semibold text-[var(--color-text)] transition hover:border-[var(--color-border-strong)]'
               >
                 Change Photo
               </label>
               <button
-                type="button"
+                type='button'
                 onClick={handleRemove}
-                className="btn btn-ghost btn-sm text-red-600"
+                className='inline-flex items-center justify-center rounded-full border border-red-200 bg-white px-3 py-1.5 text-xs font-semibold text-red-600 transition hover:bg-red-50'
               >
                 Remove
               </button>
@@ -162,10 +166,10 @@ export function ImageUpload({ file, onFileChange, error }: ImageUploadProps) {
       )}
 
       {displayError && (
-        <p className="form-error" role="alert">
+        <p className='text-sm font-semibold text-red-600' role='alert'>
           {displayError}
         </p>
       )}
     </div>
-  );
+  )
 }
