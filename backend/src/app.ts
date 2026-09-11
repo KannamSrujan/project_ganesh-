@@ -2,14 +2,20 @@ import express, { Express, Request, Response, NextFunction } from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import cookieParser from 'cookie-parser';
+import path from 'path';
+import fs from 'fs';
 import mandapamsRouter from './routes/mandapams.routes.js';
 import adminRouter from './routes/admin.routes.js';
 
 export function createApp(): Express {
   const app = express();
 
-  // Security headers via Helmet (configured appropriately for API backend)
-  app.use(helmet());
+  // Security headers via Helmet (allow cross-origin for local asset images)
+  app.use(
+    helmet({
+      crossOriginResourcePolicy: { policy: 'cross-origin' },
+    }),
+  );
 
   // Hardened CORS: allow development origin and any configured in CORS_ORIGIN
   const allowedOrigins = new Set<string>(['http://localhost:5173']);
@@ -40,6 +46,14 @@ export function createApp(): Express {
   app.use(cookieParser());
   app.use(express.json({ limit: '100kb' }));
   app.use(express.urlencoded({ extended: true, limit: '100kb' }));
+
+  // Static directory for uploaded mandapam images
+  const uploadsDir = path.resolve(process.cwd(), 'uploads');
+  if (!fs.existsSync(uploadsDir)) {
+    fs.mkdirSync(uploadsDir, { recursive: true });
+  }
+  app.use('/api/uploads', express.static(uploadsDir));
+  app.use('/uploads', express.static(uploadsDir));
 
   // Health check
   app.get('/api/health', (_req: Request, res: Response) => {

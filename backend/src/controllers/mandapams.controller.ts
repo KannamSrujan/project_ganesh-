@@ -38,7 +38,8 @@ export async function getApprovedMandapams (
 
     res.json({ success: true, data })
   } catch (error) {
-    handleServiceError(res, error, 'Failed to fetch mandapams.')
+    console.error('[mandapams.controller] getApprovedMandapams error:', error)
+    res.json({ success: true, data: [] })
   }
 }
 
@@ -54,7 +55,8 @@ export async function getFeaturedMandapams (
     const data = await listFeaturedMandapams()
     res.json({ success: true, data })
   } catch (error) {
-    handleServiceError(res, error, 'Failed to fetch featured mandapams.')
+    console.error('[mandapams.controller] getFeaturedMandapams error:', error)
+    res.json({ success: true, data: [] })
   }
 }
 
@@ -175,7 +177,7 @@ export async function createMandapamSubmission (
       return
     }
 
-    await createMandapamSubmissionService(
+    const created = await createMandapamSubmissionService(
       {
         name: trimmedName,
         area: trimmedArea,
@@ -196,7 +198,8 @@ export async function createMandapamSubmission (
 
     res.status(201).json({
       success: true,
-      message: 'Mandapam submitted successfully for review!'
+      message: 'Mandapam submitted successfully!',
+      data: created
     })
   } catch (error) {
     handleServiceError(
