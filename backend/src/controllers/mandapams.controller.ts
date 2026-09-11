@@ -170,12 +170,22 @@ export async function createMandapamSubmission (
     const lat = Number(latitude)
     const lng = Number(longitude)
 
-    if (Number.isNaN(lat) || Number.isNaN(lng)) {
+    if (Number.isNaN(lat) || lat < -90 || lat > 90) {
       res
         .status(400)
         .json({
           success: false,
-          error: 'Valid latitude and longitude are required'
+          error: 'Valid latitude between -90 and 90 is required.'
+        })
+      return
+    }
+
+    if (Number.isNaN(lng) || lng < -180 || lng > 180) {
+      res
+        .status(400)
+        .json({
+          success: false,
+          error: 'Valid longitude between -180 and 180 is required.'
         })
       return
     }

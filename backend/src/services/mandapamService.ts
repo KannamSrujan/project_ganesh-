@@ -3,6 +3,14 @@ import { getSupabaseClient } from '../config/supabase.js';
 import { getSupabaseAdminClient } from '../config/supabaseAdmin.js';
 import { localStore } from './localStore.js';
 import type { Mandapam, MandapamStatus } from '../types/mandapam.js';
+import {
+  uploadMandapamImage,
+  deleteMandapamImage,
+  resolveImageUrl,
+  resolveMandapamImages,
+  resolveMandapamsImages,
+  isSupabaseStoragePath,
+} from './storageService.js';
 
 const UUID_REGEX =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -94,16 +102,16 @@ export async function listApprovedMandapams(
     const { data, error } = await withTimeout(Promise.resolve(query), 800);
 
     if (error || !data || data.length === 0) {
-      return localData;
+      return resolveMandapamsImages(localData);
     }
 
     // Merge Supabase items with local items (avoiding duplicates by id)
     const localIds = new Set(localData.map((m) => m.id));
     const remoteItems = (data as Mandapam[]).filter((m) => !localIds.has(m.id));
-    return [...localData, ...remoteItems];
+    return resolveMandapamsImages([...localData, ...remoteItems]);
   } catch (err) {
     // Network socket disconnected or timeout - return local store gracefully
-    return localData;
+    return resolveMandapamsImages(localData);
   }
 }
 
@@ -132,12 +140,12 @@ export async function listFeaturedMandapams(): Promise<Mandapam[]> {
     );
 
     if (error || !featured || featured.length === 0) {
-      return localFeatured;
+      return resolveMandapamsImages(localFeatured);
     }
 
-    return featured as Mandapam[];
+    return resolveMandapamsImages(featured as Mandapam[]);
   } catch {
-    return localFeatured;
+    return resolveMandapamsImages(localFeatured);
   }
 }
 
@@ -151,7 +159,7 @@ export async function getMandapamById(id: string): Promise<Mandapam> {
 
   const localItem = await localStore.getById(id);
   if (localItem && localItem.status === 'approved') {
-    return localItem;
+    return resolveMandapamImages(localItem);
   }
 
   const supabase = getPublicDbClient();
@@ -176,7 +184,7 @@ export async function getMandapamById(id: string): Promise<Mandapam> {
       throw new MandapamServiceError(404, 'Mandapam not found');
     }
 
-    return data as Mandapam;
+    return resolveMandapamImages(data as Mandapam);
   } catch (error) {
     if (error instanceof MandapamServiceError) throw error;
     throw new MandapamServiceError(404, 'Mandapam not found');
@@ -192,7 +200,7 @@ export async function createMandapamSubmission(
   payload: MandapamSubmissionInput,
   file?: UploadedFile
 ): Promise<Mandapam> {
-  let localImagePath: string | null = null;
+  let storedImagePath: string | null = null;
 
   if (file) {
     const rawExt = file.originalname.split('.').pop()?.toLowerCase() || '';
@@ -205,11 +213,20 @@ export async function createMandapamSubmission(
       );
     }
 
+    // Try Supabase Storage upload first
     try {
-      localImagePath = await localStore.saveUploadedFile(file.buffer, file.originalname);
-    } catch (err) {
-      console.error('[mandapamService] Error saving uploaded file:', err);
-      throw new MandapamServiceError(500, 'Failed to process uploaded photo.');
+      storedImagePath = await uploadMandapamImage(file.buffer, file.mimetype, rawExt);
+    } catch (storageErr) {
+      console.warn(
+        '[mandapamService] Supabase Storage upload failed, falling back to localStore:',
+        storageErr instanceof Error ? storageErr.message : 'Unknown error'
+      );
+      try {
+        storedImagePath = await localStore.saveUploadedFile(file.buffer, file.originalname);
+      } catch (err) {
+        console.error('[mandapamService] Error saving uploaded file to localStore:', err);
+        throw new MandapamServiceError(500, 'Failed to process uploaded photo.');
+      }
     }
   }
 
@@ -222,7 +239,7 @@ export async function createMandapamSubmission(
     description: payload.description?.trim() || null,
     latitude: payload.latitude,
     longitude: payload.longitude,
-    image_url: localImagePath,
+    image_url: storedImagePath,
     status: 'pending',
     is_featured: false,
     is_verified: false,
@@ -264,7 +281,7 @@ export async function createMandapamSubmission(
     })();
   }
 
-  return createdRecord;
+  return resolveMandapamImages(createdRecord);
 }
 
 /**
@@ -275,9 +292,10 @@ export async function listAdminMandapams(status?: string): Promise<Mandapam[]> {
   const validStatus = status && status !== 'all' ? status : undefined;
 
   let result = validStatus ? allItems.filter((m) => m.status === validStatus) : allItems;
-  return result.sort(
+  const sorted = result.sort(
     (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
   );
+  return resolveMandapamsImages(sorted);
 }
 
 /**
@@ -295,9 +313,11 @@ export async function getAdminMandapamById(
     throw new MandapamServiceError(404, 'Mandapam not found.');
   }
 
+  const signedUrl = await resolveImageUrl(mandapam.image_url, 300);
+
   return {
     ...mandapam,
-    signed_image_url: mandapam.image_url,
+    signed_image_url: signedUrl,
   };
 }
 
@@ -421,11 +441,28 @@ export async function deleteMandapam(id: string): Promise<void> {
     throw new MandapamServiceError(400, 'Invalid mandapam ID format.');
   }
 
+  const mandapam = await localStore.getById(id);
+  if (!mandapam) {
+    throw new MandapamServiceError(404, 'Mandapam not found.');
+  }
+
+  // 1. Delete image from Supabase Storage if it was uploaded to Supabase
+  if (mandapam.image_url && isSupabaseStoragePath(mandapam.image_url)) {
+    await deleteMandapamImage(mandapam.image_url).catch((err) => {
+      console.warn(
+        '[mandapamService] Failed to delete Supabase storage object:',
+        err?.message || err
+      );
+    });
+  }
+
+  // 2. Delete from localStore (also cleans up local filesystem if starts with /api/uploads/)
   const deleted = await localStore.delete(id);
   if (!deleted) {
     throw new MandapamServiceError(404, 'Mandapam not found.');
   }
 
+  // 3. Delete from Supabase Database
   const supabase = getDbClient();
   if (supabase) {
     withTimeout(
