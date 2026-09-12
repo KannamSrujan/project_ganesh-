@@ -64,7 +64,7 @@ export function SubmitMandapamForm () {
 
     const trimmedName = name.trim()
     if (!trimmedName) {
-      newErrors.name = 'Mandapam name is required.'
+      newErrors.name = 'Association name is required.'
     } else if (trimmedName.length < 2) {
       newErrors.name = 'Name must be at least 2 characters.'
     } else if (trimmedName.length > 120) {
@@ -195,7 +195,7 @@ export function SubmitMandapamForm () {
             htmlFor={nameInputId}
             className='flex items-center gap-1 text-sm font-bold text-[var(--color-text)]'
           >
-            Mandapam Name <span className='text-red-600'>*</span>
+            Association Name <span className='text-red-600'>*</span>
           </label>
           <input
             id={nameInputId}

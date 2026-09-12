@@ -105,6 +105,21 @@ export function MandapamDetailPage () {
     })
   }, [allMandapams, singleMandapam, userLocation])
 
+  useEffect(() => {
+    if (!userLocation) return
+
+    const nearbyResultsSection = document.getElementById('nearby-results')
+
+    if (nearbyResultsSection) {
+      window.requestAnimationFrame(() => {
+        nearbyResultsSection.scrollIntoView({
+          behavior: 'smooth',
+          block: 'start'
+        })
+      })
+    }
+  }, [userLocation, recommendation.items.length])
+
   if (loadingSingle) {
     return (
       <>
@@ -287,6 +302,10 @@ export function MandapamDetailPage () {
                 <ShareButton
                   mandapamName={mandapam.name}
                   area={mandapam.area}
+                  description={mandapam.description}
+                  imageUrl={displayImage || fallbackImage}
+                  shareUrl={window.location.href}
+                  directionsUrl={directionsUrl}
                   className='inline-flex flex-1 items-center justify-center rounded-full border border-[var(--color-border)] bg-[var(--color-surface-muted)] px-5 py-3 text-sm font-semibold text-[var(--color-text)] transition hover:border-[var(--color-border-strong)] sm:flex-none'
                 />
               </div>
@@ -368,7 +387,11 @@ export function MandapamDetailPage () {
           </section>
 
           {recommendation.items.length > 0 && (
-            <section className='mt-16' aria-label={recommendation.title}>
+            <section
+              id='nearby-results'
+              className='mt-16'
+              aria-label={recommendation.title}
+            >
               <div className='mb-6'>
                 <p className='mb-2 text-[0.7rem] font-semibold uppercase tracking-[0.16em] text-[var(--color-text-muted)]'>
                   {recommendation.source === 'near-you'

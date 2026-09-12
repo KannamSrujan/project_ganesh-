@@ -20,6 +20,8 @@ export function HomepageContent ({
   loading = false,
   error = null
 }: HomepageContentProps) {
+  const NEAR_ME_RADIUS_KM = 10
+
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedArea, setSelectedArea] = useState<string | null>(null)
 
@@ -68,10 +70,12 @@ export function HomepageContent ({
     })
 
     if (sortByDistance && userLocation) {
-      result = [...result].sort(
-        (a, b) =>
-          (distanceMap[a.id] ?? Infinity) - (distanceMap[b.id] ?? Infinity)
-      )
+      result = result
+        .filter(m => (distanceMap[m.id] ?? Infinity) <= NEAR_ME_RADIUS_KM)
+        .sort(
+          (a, b) =>
+            (distanceMap[a.id] ?? Infinity) - (distanceMap[b.id] ?? Infinity)
+        )
     }
 
     return result
@@ -81,7 +85,8 @@ export function HomepageContent ({
     selectedArea,
     sortByDistance,
     userLocation,
-    distanceMap
+    distanceMap,
+    NEAR_ME_RADIUS_KM
   ])
 
   const handleNearMe = useCallback(() => {
@@ -172,7 +177,13 @@ export function HomepageContent ({
         distanceMap={distanceMap}
       />
 
-      <MapSection allMandapams={allMandapams} userLocation={userLocation} />
+      <MapSection
+        mandapams={
+          sortByDistance && userLocation ? filteredMandapams : allMandapams
+        }
+        userLocation={userLocation}
+        nearMeActive={sortByDistance && Boolean(userLocation)}
+      />
 
       <AllMandapamsSection
         allMandapams={allMandapams}

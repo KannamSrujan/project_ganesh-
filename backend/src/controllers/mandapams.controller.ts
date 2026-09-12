@@ -36,7 +36,7 @@ export async function getApprovedMandapams (
       typeof search === 'string' ? search : undefined
     )
 
-    res.set('Cache-Control', 'public, max-age=30, stale-while-revalidate=60');
+    res.set('Cache-Control', 'public, max-age=30, stale-while-revalidate=60')
     res.json({ success: true, data })
   } catch (error) {
     console.error('[mandapams.controller] getApprovedMandapams error:', error)
@@ -54,7 +54,7 @@ export async function getFeaturedMandapams (
 ): Promise<void> {
   try {
     const data = await listFeaturedMandapams()
-    res.set('Cache-Control', 'public, max-age=60, stale-while-revalidate=120');
+    res.set('Cache-Control', 'public, max-age=60, stale-while-revalidate=120')
     res.json({ success: true, data })
   } catch (error) {
     console.error('[mandapams.controller] getFeaturedMandapams error:', error)
@@ -75,7 +75,7 @@ export async function getMandapamById (
     const id = Array.isArray(rawId) ? rawId[0] : rawId
     const data = await getMandapamByIdService(id ?? '')
 
-    res.set('Cache-Control', 'public, max-age=60');
+    res.set('Cache-Control', 'public, max-age=60')
     res.json({ success: true, data })
   } catch (error) {
     handleServiceError(res, error, 'Failed to fetch mandapam details.')
@@ -104,18 +104,16 @@ export async function createMandapamSubmission (
     if (!name || !String(name).trim()) {
       res
         .status(400)
-        .json({ success: false, error: 'Mandapam name is required' })
+        .json({ success: false, error: 'Association name is required' })
       return
     }
 
     const trimmedName = String(name).trim()
     if (trimmedName.length > 150) {
-      res
-        .status(400)
-        .json({
-          success: false,
-          error: 'Mandapam name must not exceed 150 characters.'
-        })
+      res.status(400).json({
+        success: false,
+        error: 'Association name must not exceed 150 characters.'
+      })
       return
     }
 
@@ -136,34 +134,28 @@ export async function createMandapamSubmission (
 
     const trimmedAddress = address ? String(address).trim() : null
     if (trimmedAddress && trimmedAddress.length > 300) {
-      res
-        .status(400)
-        .json({
-          success: false,
-          error: 'Address must not exceed 300 characters.'
-        })
+      res.status(400).json({
+        success: false,
+        error: 'Address must not exceed 300 characters.'
+      })
       return
     }
 
     const trimmedDescription = description ? String(description).trim() : null
     if (trimmedDescription && trimmedDescription.length > 2000) {
-      res
-        .status(400)
-        .json({
-          success: false,
-          error: 'Description must not exceed 2000 characters.'
-        })
+      res.status(400).json({
+        success: false,
+        error: 'Description must not exceed 2000 characters.'
+      })
       return
     }
 
     const trimmedSubmittedBy = submitted_by ? String(submitted_by).trim() : null
     if (trimmedSubmittedBy && trimmedSubmittedBy.length > 150) {
-      res
-        .status(400)
-        .json({
-          success: false,
-          error: 'Submitted by must not exceed 150 characters.'
-        })
+      res.status(400).json({
+        success: false,
+        error: 'Submitted by must not exceed 150 characters.'
+      })
       return
     }
 
@@ -171,22 +163,18 @@ export async function createMandapamSubmission (
     const lng = Number(longitude)
 
     if (Number.isNaN(lat) || lat < -90 || lat > 90) {
-      res
-        .status(400)
-        .json({
-          success: false,
-          error: 'Valid latitude between -90 and 90 is required.'
-        })
+      res.status(400).json({
+        success: false,
+        error: 'Valid latitude between -90 and 90 is required.'
+      })
       return
     }
 
     if (Number.isNaN(lng) || lng < -180 || lng > 180) {
-      res
-        .status(400)
-        .json({
-          success: false,
-          error: 'Valid longitude between -180 and 180 is required.'
-        })
+      res.status(400).json({
+        success: false,
+        error: 'Valid longitude between -180 and 180 is required.'
+      })
       return
     }
 

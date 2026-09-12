@@ -307,7 +307,7 @@ export function AdminDashboardPage () {
         {
           title: 'Submission',
           items: [
-            { label: 'Mandapam Name', value: inspectingMandapam.name },
+            { label: 'Association Name', value: inspectingMandapam.name },
             { label: 'Area', value: inspectingMandapam.area },
             { label: 'Location', value: inspectingMandapam.address },
             {
@@ -974,7 +974,7 @@ export function AdminDashboardPage () {
             <form onSubmit={handleSaveEdit} className='space-y-4 p-5'>
               <div className='space-y-2'>
                 <label className='text-sm font-bold text-[var(--color-text)]'>
-                  Mandapam Name *
+                  Association Name *
                 </label>
                 <input
                   type='text'

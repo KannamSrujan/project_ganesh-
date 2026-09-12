@@ -8,12 +8,8 @@ export function AreaFilter ({ areas, selectedArea, onSelect }: AreaFilterProps) 
   if (areas.length === 0) return null
 
   return (
-    <div
-      className='mx-auto max-w-2xl overflow-hidden'
-      role='group'
-      aria-label='Filter by area'
-    >
-      <div className='flex gap-2 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden'>
+    <div className='w-full' role='group' aria-label='Filter by area'>
+      <div className='flex flex-wrap items-center justify-center gap-2 pb-1 sm:justify-start'>
         <button
           type='button'
           onClick={() => onSelect(null)}

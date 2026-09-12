@@ -10,7 +10,7 @@ export function SearchBar ({
   placeholder = 'Search mandapams or areas...'
 }: SearchBarProps) {
   return (
-    <div className='relative mx-auto mb-4 max-w-2xl'>
+    <div className='relative mx-auto mb-4 w-full'>
       <span
         className='pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-base text-[var(--color-text-muted)]'
         aria-hidden='true'

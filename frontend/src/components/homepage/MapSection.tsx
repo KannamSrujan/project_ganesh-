@@ -2,11 +2,16 @@ import { MandapamMap } from '../map/MandapamMap'
 import type { Mandapam } from '../../types/mandapam'
 
 interface MapSectionProps {
-  allMandapams: Mandapam[]
+  mandapams: Mandapam[]
   userLocation: { lat: number; lng: number } | null
+  nearMeActive?: boolean
 }
 
-export function MapSection ({ allMandapams, userLocation }: MapSectionProps) {
+export function MapSection ({
+  mandapams,
+  userLocation,
+  nearMeActive = false
+}: MapSectionProps) {
   return (
     <section className='py-16' aria-label='Map of mandapams'>
       <div className='container'>
@@ -14,10 +19,12 @@ export function MapSection ({ allMandapams, userLocation }: MapSectionProps) {
           📍 Mandapam Map
         </h2>
         <p className='mb-5 text-sm text-[var(--color-text-secondary)]'>
-          All verified Ganesh mandapams across Hyderabad.
+          {nearMeActive
+            ? 'Showing mandapams within 10 km of your location.'
+            : 'All verified Ganesh mandapams across Hyderabad.'}
         </p>
         <div className='overflow-hidden rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-white'>
-          <MandapamMap mandapams={allMandapams} userLocation={userLocation} />
+          <MandapamMap mandapams={mandapams} userLocation={userLocation} />
         </div>
       </div>
     </section>
